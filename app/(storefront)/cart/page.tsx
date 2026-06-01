@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { getCart } from "@/lib/shopify/queries/cart";
 import Link from "next/link";
 import Image from "next/image";
+import { CartActions } from "./cart-actions";
 
 const CART_COOKIE = "shopify_cart_id";
 
@@ -75,11 +76,12 @@ export default async function CartPage() {
             <span style={{ color: "var(--muted)" }}>Subtotal</span>
             <span style={{ fontWeight: 600 }}>{new Intl.NumberFormat("en-US", { style: "currency", currency }).format(subtotal)}</span>
           </div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 20 }}>Shipping & taxes calculated at checkout</div>
-          <a href={cart.checkoutUrl} className="btn btn-primary btn-block" style={{ textAlign: "center", display: "block" }}>
-            Proceed to Checkout
-          </a>
-          <Link href="/" className="btn btn-block" style={{ textAlign: "center", display: "block", marginTop: 8 }}>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 20 }}>Shipping &amp; taxes calculated at checkout</div>
+          <CartActions
+            checkoutUrl={cart.checkoutUrl}
+            lines={cart.lines.edges.map(({ node }) => node)}
+          />
+          <Link href="/" className="btn btn-ghost btn-block" style={{ textAlign: "center", display: "block", marginTop: 8 }}>
             Continue Shopping
           </Link>
         </div>

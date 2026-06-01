@@ -26,7 +26,7 @@ function BrandStrip(props: any) {
   const [allBrands, setAllBrands] = useState<BCBrand[] | null>(null);
 
   useEffect(() => {
-    fetch("/api/bc/brands")
+    fetch("/api/shopify/vendors")
       .then((r) => r.json())
       .then((data: BCBrand[]) => setAllBrands(Array.isArray(data) ? data : []))
       .catch(() => setAllBrands([]));

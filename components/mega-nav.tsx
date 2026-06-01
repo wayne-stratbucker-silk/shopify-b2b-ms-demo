@@ -1,13 +1,12 @@
 "use client";
 
-// Desktop mega-navigation — ported from the Navigation Desktop design
-// (design/bigcommerce-b2b-accelerator/project/navigation-desktop.jsx).
+// Desktop mega-navigation.
 //
-// The category tree is pulled LIVE from BigCommerce via /api/bc/categories/tree
-// and rendered at whatever depth BC provides (1–4 levels). Nothing here is
-// editable from Makeswift — the taxonomy is the backend's source of truth.
-// Top-level items with no children render as plain links; items with children
-// open the mega-panel (or a compact dropdown when they have no L3 nesting).
+// The collection list is pulled LIVE from Shopify via /api/shopify/collections.
+// Collections are flat (no hierarchy), so all items render as plain links.
+// Nothing here is editable from Makeswift — the taxonomy is the backend's
+// source of truth. Items with children open the mega-panel (or compact
+// dropdown when they have no L3 nesting).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react";
 import Link from "next/link";
@@ -143,10 +142,10 @@ export default function MegaNav({
   // BACK — as the viewport widens. Without this the bar could only shrink.
   const itemWidths = useRef<number[]>([]);
 
-  // Pull the live category tree unless a tree was passed in.
+  // Pull the live collection list unless a tree was passed in.
   useEffect(() => {
     if (treeProp) return;
-    fetch("/api/bc/categories/tree")
+    fetch("/api/shopify/collections")
       .then((r) => r.json())
       .then((data: NavNode[]) => {
         if (Array.isArray(data)) setFetched(data);

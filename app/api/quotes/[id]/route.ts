@@ -15,22 +15,46 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   return NextResponse.json(quote);
 }
 
-// Accept quote — sends invoice email and returns invoice URL
+// Quote actions: accept, approve, email, message, status
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!hasPermission(session.permissions, "company.quotes.approve")) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const { id } = await params;
   const draftOrderId = decodeURIComponent(id);
-  const { action, status, message } = await req.json();
+  const { action, status, message } = await req.json() as {
+    action?: string;
+    status?: string;
+    message?: string;
+  };
 
+  // Accept: buyer accepts the quoted price and proceeds to checkout.
+  // Requires order creation permission (not quote.approve — that's for internal approval).
   if (action === "accept") {
+    if (!hasPermission(session.permissions, "company.orders.create")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const { invoiceUrl } = await sendQuoteInvoice(draftOrderId);
     await updateQuoteStatus(draftOrderId, "ordered");
     return NextResponse.json({ invoiceUrl });
+  }
+
+  // Approve: internal company admin approves a pending quote before it goes to sales rep.
+  if (action === "approve") {
+    if (!hasPermission(session.permissions, "company.quotes.approve")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    await updateQuoteStatus(draftOrderId, "in_process");
+    return NextResponse.json({ ok: true });
+  }
+
+  // Email: send Shopify draft order invoice email to the buyer (sales rep action).
+  if (action === "email") {
+    if (!hasPermission(session.permissions, "company.quotes.approve")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const { invoiceUrl } = await sendQuoteInvoice(draftOrderId);
+    return NextResponse.json({ ok: true, invoiceUrl });
   }
 
   if (action === "message" && message) {

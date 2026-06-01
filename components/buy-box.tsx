@@ -80,13 +80,12 @@ export function BuyBox({ product: p, isLoggedIn, variantId, forceOutOfStock = fa
   useEffect(() => {
     // Untracked products carry no meaningful per-location stock — skip the fetch.
     if (!p.trackInventory) return;
-    const key = variantId != null ? `${p.id}-${variantId}` : `${p.id}`;
+    const key = p.variantId ?? p.id;
     if (fetchedKey.current === key) return;
     setLocationLoading(true);
-    const productId = parseInt(p.id, 10);
-    const url = variantId != null
-      ? `/api/bc/inventory?productId=${productId}&variantId=${variantId}`
-      : `/api/bc/inventory?productId=${productId}`;
+    const url = p.variantId
+      ? `/api/shopify/inventory?variantId=${encodeURIComponent(p.variantId)}`
+      : `/api/shopify/inventory?productId=${encodeURIComponent(p.id)}`;
     fetch(url)
       .then((r) => r.json())
       .then((d: { warehouses: { name: string; qty: number; locationId?: number }[] }) => {
@@ -95,7 +94,7 @@ export function BuyBox({ product: p, isLoggedIn, variantId, forceOutOfStock = fa
       })
       .catch(() => { setLocationWarehouses([]); })
       .finally(() => setLocationLoading(false));
-  }, [variantId, p.id, p.trackInventory]);
+  }, [p.variantId, p.id, p.trackInventory]);
 
   // Authoritative total: sum of all location quantities once loaded.
   // Fall back to p.stockQty when warehouses is null (not yet loaded) OR an
