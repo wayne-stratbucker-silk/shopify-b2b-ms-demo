@@ -5,7 +5,6 @@ import createWithMakeswift from "@makeswift/runtime/next/plugin";
 const withMakeswift = createWithMakeswift();
 
 const nextConfig: NextConfig = {
-  output: "standalone",
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "cdn.shopify.com" },
