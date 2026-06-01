@@ -25,7 +25,6 @@ const PRODUCT_FIELDS = `
         sku
         title
         availableForSale
-        quantityAvailable
         price { amount currencyCode }
         compareAtPrice { amount currencyCode }
         selectedOptions { name value }

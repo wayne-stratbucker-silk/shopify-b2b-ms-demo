@@ -14,10 +14,7 @@ export function mapProduct(shopifyProduct: ShopifyProduct, customerSku?: string)
   const tiers: Array<{ minQty: number; unitPrice: number }> = [];
 
   const inStock = shopifyProduct.variants.edges.some((e) => e.node.availableForSale);
-  const totalQty = shopifyProduct.variants.edges.reduce(
-    (sum, e) => sum + (e.node.quantityAvailable ?? 0),
-    0,
-  );
+  const totalQty = 0; // quantityAvailable requires unauthenticated_read_product_inventory scope
 
   return {
     id: shopifyProduct.id,
