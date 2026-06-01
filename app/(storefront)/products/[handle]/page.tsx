@@ -3,6 +3,7 @@ import { getProduct } from "@/lib/shopify/queries/products";
 import { mapProduct } from "@/lib/shopify/product-fetcher";
 import { PDPPage, type PDPResult } from "@/components/pdp-page";
 import { getSession } from "@/lib/auth/session";
+import { getCompanySkuMap, lookupCustomerSku } from "@/lib/shopify/customer-skus";
 import type { BuyerContext } from "@/lib/shopify/storefront-client";
 import type { Metadata } from "next";
 
@@ -28,10 +29,15 @@ export default async function ProductPage({ params }: Props) {
     ? { companyLocationId: session.companyLocationId }
     : undefined;
 
-  const shopifyProduct = await getProduct(handle, buyer);
+  const [shopifyProduct, skuMap] = await Promise.all([
+    getProduct(handle, buyer),
+    getCompanySkuMap(session?.companyId),
+  ]);
   if (!shopifyProduct) return notFound();
 
-  const product = mapProduct(shopifyProduct);
+  const defaultSku = shopifyProduct.variants.edges[0]?.node?.sku ?? "";
+  const customerSku = lookupCustomerSku(skuMap, defaultSku);
+  const product = mapProduct(shopifyProduct, customerSku);
   const numericId = parseInt(shopifyProduct.id.split("/").pop() ?? "0", 10);
   const result: PDPResult = {
     product,

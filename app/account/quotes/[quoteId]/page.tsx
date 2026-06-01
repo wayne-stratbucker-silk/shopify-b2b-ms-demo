@@ -34,9 +34,17 @@ export default async function QuoteDetailPage({ params }: Props) {
   const quote = await getQuote(draftOrderId).catch(() => null);
   if (!quote) return notFound();
 
+  // Any buyer with order creation rights can accept a vendor's quoted price
   const canAccept = quote.allowCheckout &&
-    hasPermission(session.permissions, "company.quotes.approve") &&
+    quote.status === "in_process" &&
     hasPermission(session.permissions, "company.orders.create");
+
+  // Admins can internally approve a new quote (sending it to the sales rep)
+  const canApprove = quote.status === "new" &&
+    hasPermission(session.permissions, "company.quotes.approve");
+
+  // Admins can send the Shopify draft-order invoice email to the buyer
+  const canSendEmail = hasPermission(session.permissions, "company.quotes.approve");
 
   return (
     <div>
@@ -108,11 +116,27 @@ export default async function QuoteDetailPage({ params }: Props) {
               <form action={`/api/quotes/${encodeURIComponent(quote.id)}`} method="POST">
                 <input type="hidden" name="action" value="accept" />
                 <button type="submit" className="btn btn-primary btn-block">
-                  Accept & Checkout →
+                  Accept &amp; Checkout →
                 </button>
               </form>
             )}
-            {quote.status === "in_process" && !canAccept && (
+            {canApprove && (
+              <form action={`/api/quotes/${encodeURIComponent(quote.id)}`} method="POST" style={{ marginTop: canAccept ? 8 : 0 }}>
+                <input type="hidden" name="action" value="approve" />
+                <button type="submit" className="btn btn-block" style={{ borderColor: "var(--success)", color: "var(--success)" }}>
+                  Approve Quote
+                </button>
+              </form>
+            )}
+            {canSendEmail && (
+              <form action={`/api/quotes/${encodeURIComponent(quote.id)}`} method="POST" style={{ marginTop: 8 }}>
+                <input type="hidden" name="action" value="email" />
+                <button type="submit" className="btn btn-ghost btn-block">
+                  Send Invoice Email
+                </button>
+              </form>
+            )}
+            {quote.status === "in_process" && !canAccept && !canSendEmail && (
               <p className="text-sm" style={{ color: "var(--muted)" }}>Contact your admin to approve this quote.</p>
             )}
           </div>
