@@ -9,7 +9,7 @@
 
 import type { LineItem } from "@/types/line-item";
 import type { Product } from "@/types";
-import type { NormalizedHit } from "@/lib/algolia/connector-hit";
+import type { ShopifyConnectorHit } from "@/lib/algolia/connector-hit";
 
 export interface ToLineItemOpts {
   quantity?: number;
@@ -23,20 +23,22 @@ export interface ToLineItemOpts {
 /** Build a canonical LineItem from a hydrated `Product`. */
 export function toLineItem(product: Product, opts?: ToLineItemOpts): LineItem;
 /** Build a canonical LineItem from a normalized Algolia hit. */
-export function toLineItem(hit: NormalizedHit, opts?: ToLineItemOpts): LineItem;
+export function toLineItem(hit: ShopifyConnectorHit, opts?: ToLineItemOpts): LineItem;
 export function toLineItem(
-  source: Product | NormalizedHit,
+  source: Product | ShopifyConnectorHit,
   opts: ToLineItemOpts = {},
 ): LineItem {
   const isProduct = "id" in source && typeof (source as Product).id === "string";
   const productId = isProduct
     ? parseInt((source as Product).id, 10)
-    : Number((source as NormalizedHit).productId ?? 0);
+    : Number((source as ShopifyConnectorHit).id ?? 0);
 
-  const unitPrice = opts.unitPrice ?? source.price ?? 0;
-  const listPrice = source.listPrice ?? undefined;
+  const unitPrice = opts.unitPrice ?? (source as { price?: number }).price ?? 0;
+  const listPrice = (source as { listPrice?: number; compare_at_price?: number }).listPrice
+    ?? (source as ShopifyConnectorHit).compare_at_price
+    ?? undefined;
 
-  // customerSku lives on Product; NormalizedHit doesn't carry it (overlay
+  // customerSku lives on Product; ShopifyConnectorHit doesn't carry it (overlay
   // happens client-side after the hit returns). Caller may pass explicitly.
   const customerSku =
     opts.customerSku ?? (isProduct ? (source as Product).customerSku : undefined);
@@ -46,7 +48,7 @@ export function toLineItem(
     variantId: opts.variantId,
     sku: source.sku ?? "",
     customerSku,
-    name: source.name ?? "",
+    name: (source as { name?: string; title?: string }).name ?? (source as ShopifyConnectorHit).title ?? "",
     quantity: Math.max(1, Math.floor(opts.quantity ?? 1)),
     unitPrice,
     listPrice,
@@ -54,13 +56,13 @@ export function toLineItem(
   };
 }
 
-function pickImage(source: Product | NormalizedHit, isProduct: boolean): string | undefined {
+function pickImage(source: Product | ShopifyConnectorHit, isProduct: boolean): string | undefined {
   if (isProduct) {
     const p = source as Product;
     if (p.images && p.images.length > 0) return p.images[0];
     if (p.galleryImages && p.galleryImages.length > 0) return p.galleryImages[0].url;
     return undefined;
   }
-  const h = source as NormalizedHit;
+  const h = source as ShopifyConnectorHit;
   return h.image ?? undefined;
 }

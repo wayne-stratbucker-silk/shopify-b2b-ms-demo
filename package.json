@@ -8,9 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
-    "seed": "npx dotenv -e .env.local tsx scripts/shopify-seed.mts",
-    "algolia-sync": "npx dotenv -e .env.local tsx scripts/algolia-sync.mts",
-    "register-webhooks": "npx dotenv -e .env.local tsx scripts/register-webhooks.mts"
+    "seed": "node --env-file=.env.local --import tsx/esm scripts/shopify-seed.mts",
+    "algolia-sync": "node --env-file=.env.local --import tsx/esm scripts/algolia-sync.mts",
+    "register-webhooks": "node --env-file=.env.local --import tsx/esm scripts/register-webhooks.mts"
   },
   "dependencies": {
     "@algolia/autocomplete-js": "^1.19.8",

@@ -187,22 +187,40 @@ const PRODUCTS = [
   ]},
 ];
 
+async function getDefaultLocationId(): Promise<string> {
+  const data = await graphql<{ locations: { edges: Array<{ node: { id: string } }> } }>(
+    `query { locations(first: 1) { edges { node { id } } } }`
+  );
+  const id = data.locations.edges[0]?.node.id ?? "";
+  if (id) console.log(`  Location: ${id}`);
+  return id;
+}
+
 async function createProducts(collectionIds: Record<string, string>): Promise<string[]> {
   console.log("\n📦 Creating products...");
   const productIds: string[] = [];
+  const locationId = await getDefaultLocationId();
 
   for (const product of PRODUCTS) {
-    // Create product with first variant inline
     const firstVariant = product.variants[0];
+
+    // Step 1: Create product — variants NOT in ProductInput in 2025-04
     const data = await graphql<{
       productCreate: {
-        product: { id: string; handle: string } | null;
-        userErrors: Array<{ message: string }>;
+        product: {
+          id: string;
+          handle: string;
+          variants: { edges: Array<{ node: { id: string; inventoryItem: { id: string } } }> };
+        } | null;
+        userErrors: Array<{ field: string[]; message: string }>;
       };
     }>(
       `mutation CreateProduct($input: ProductInput!) {
         productCreate(input: $input) {
-          product { id handle }
+          product {
+            id handle
+            variants(first: 1) { edges { node { id inventoryItem { id } } } }
+          }
           userErrors { field message }
         }
       }`,
@@ -212,17 +230,10 @@ async function createProducts(collectionIds: Record<string, string>): Promise<st
           vendor: product.vendor,
           productType: COLLECTIONS.find(c => c.handle === product.collection)?.title ?? "",
           tags: [product.collection, "b2b-demo"],
+          status: "ACTIVE",
           metafields: [
             { namespace: "custom", key: "uom", value: product.uom, type: "single_line_text_field" },
           ],
-          variants: [{
-            sku: firstVariant?.sku ?? product.sku,
-            price: firstVariant?.price ?? product.price,
-            compareAtPrice: (firstVariant as { compareAtPrice?: string })?.compareAtPrice,
-            inventoryManagement: "SHOPIFY",
-            inventoryPolicy: "DENY",
-            inventoryQuantities: [{ availableQuantity: 150, locationId: "" }],
-          }],
         },
       }
     );
@@ -234,40 +245,54 @@ async function createProducts(collectionIds: Record<string, string>): Promise<st
     }
 
     const productId = data.productCreate.product.id;
+    const defaultVariant = data.productCreate.product.variants.edges[0]?.node;
     productIds.push(productId);
 
-    // Add additional variants if any
-    if (product.variants.length > 1) {
-      const remainingVariants = product.variants.slice(1);
+    // Step 2: Update the auto-created default variant with first SKU/price
+    if (defaultVariant && firstVariant) {
       await graphql(
-        `mutation BulkCreateVariants($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-          productVariantsBulkCreate(productId: $productId, variants: $variants) {
+        `mutation UpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+          productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+            productVariants { id }
             userErrors { message }
           }
         }`,
         {
           productId,
-          variants: remainingVariants.map(v => ({
-            optionValues: [{ optionName: "Title", name: v.title }],
-            sku: v.sku,
-            price: v.price,
-            compareAtPrice: (v as { compareAtPrice?: string }).compareAtPrice,
-          })),
+          variants: [{
+            id: defaultVariant.id,
+            sku: firstVariant.sku,
+            price: firstVariant.price,
+            compareAtPrice: (firstVariant as { compareAtPrice?: string }).compareAtPrice ?? null,
+            inventoryItem: { tracked: true },
+          }],
         }
-      ).catch(e => console.warn(`  ⚠ Extra variants for ${product.title}: ${e.message}`));
+      ).catch(e => console.warn(`  ⚠ Variant update ${product.title}: ${e.message}`));
+
+      // Step 3: Set inventory quantity via inventoryAdjustQuantities
+      if (locationId && defaultVariant.inventoryItem?.id) {
+        await graphql(
+          `mutation AdjustInventory($input: InventoryAdjustQuantitiesInput!) {
+            inventoryAdjustQuantities(input: $input) {
+              userErrors { message }
+            }
+          }`,
+          {
+            input: {
+              reason: "correction",
+              name: "available",
+              changes: [{
+                delta: 150,
+                inventoryItemId: defaultVariant.inventoryItem.id,
+                locationId,
+              }],
+            },
+          }
+        ).catch(() => {/* inventory optional for demo */});
+      }
     }
 
-    // Publish product
-    await graphql(
-      `mutation Publish($input: ProductPublishInput!) {
-        productPublish(input: $input) {
-          userErrors { message }
-        }
-      }`,
-      { input: { id: productId, productPublications: [{ publicationId: "" }] } }
-    ).catch(() => {/* will publish via status update */});
-
-    // Add to collection
+    // Step 4: Add to collection
     const colId = collectionIds[product.collection];
     if (colId) {
       await graphql(
@@ -280,7 +305,7 @@ async function createProducts(collectionIds: Record<string, string>): Promise<st
       ).catch(e => console.warn(`  ⚠ Collection assign: ${e.message}`));
     }
 
-    console.log(`  ✓ Product: ${product.title} (${product.variants.length} variant${product.variants.length > 1 ? "s" : ""})`);
+    console.log(`  ✓ ${product.title} (SKU: ${firstVariant?.sku ?? product.sku})`);
     await sleep(300);
   }
 
@@ -293,17 +318,17 @@ const COMPANIES = [
     name: "Acme Electric Supply",
     externalId: "acme-001",
     contacts: [
-      { firstName: "Alice", lastName: "Admin", email: "admin@acme-electric.com", phone: "+15550100", isAdmin: true },
-      { firstName: "Bob", lastName: "Buyer", email: "buyer@acme-electric.com", phone: "+15550101", isAdmin: false },
+      { firstName: "Alice", lastName: "Admin", email: "admin@acme-electric.com", phone: "+13125550100", isAdmin: true },
+      { firstName: "Bob", lastName: "Buyer", email: "buyer@acme-electric.com", phone: "+13125550101", isAdmin: false },
     ],
     locations: [
       {
         name: "Headquarters — Chicago",
-        address: { address1: "100 Industrial Blvd", city: "Chicago", provinceCode: "IL", countryCode: "US", zip: "60601" },
+        address: { address1: "100 Industrial Blvd", city: "Chicago", zoneCode: "IL", countryCode: "US", zip: "60601" },
       },
       {
         name: "Branch — Milwaukee",
-        address: { address1: "500 Commerce St", city: "Milwaukee", provinceCode: "WI", countryCode: "US", zip: "53202" },
+        address: { address1: "500 Commerce St", city: "Milwaukee", zoneCode: "WI", countryCode: "US", zip: "53202" },
       },
     ],
     discount: 20,
@@ -312,16 +337,16 @@ const COMPANIES = [
     name: "Metro Contractors LLC",
     externalId: "metro-001",
     contacts: [
-      { firstName: "Carlos", lastName: "Manager", email: "admin@metro-contractors.com", phone: "+15550200", isAdmin: true },
+      { firstName: "Carlos", lastName: "Manager", email: "admin@metro-contractors.com", phone: "+12145550200", isAdmin: true },
     ],
     locations: [
       {
         name: "Main Office — Dallas",
-        address: { address1: "2200 Commerce Pkwy", city: "Dallas", provinceCode: "TX", countryCode: "US", zip: "75201" },
+        address: { address1: "2200 Commerce Pkwy", city: "Dallas", zoneCode: "TX", countryCode: "US", zip: "75201" },
       },
       {
         name: "Branch — Fort Worth",
-        address: { address1: "800 Industrial Dr", city: "Fort Worth", provinceCode: "TX", countryCode: "US", zip: "76102" },
+        address: { address1: "800 Industrial Dr", city: "Fort Worth", zoneCode: "TX", countryCode: "US", zip: "76102" },
       },
     ],
     discount: 15,
@@ -330,13 +355,13 @@ const COMPANIES = [
     name: "Pacific Installations Inc",
     externalId: "pacific-001",
     contacts: [
-      { firstName: "Dana", lastName: "Director", email: "admin@pacific-install.com", phone: "+15550300", isAdmin: true },
-      { firstName: "Eve", lastName: "Purchaser", email: "buyer@pacific-install.com", phone: "+15550301", isAdmin: false },
+      { firstName: "Dana", lastName: "Director", email: "admin@pacific-install.com", phone: "+12065550300", isAdmin: true },
+      { firstName: "Eve", lastName: "Purchaser", email: "buyer@pacific-install.com", phone: "+12065550301", isAdmin: false },
     ],
     locations: [
       {
         name: "HQ — Seattle",
-        address: { address1: "1400 Harbor Ave", city: "Seattle", provinceCode: "WA", countryCode: "US", zip: "98101" },
+        address: { address1: "1400 Harbor Ave", city: "Seattle", zoneCode: "WA", countryCode: "US", zip: "98101" },
       },
     ],
     discount: 10,
@@ -383,7 +408,6 @@ async function createCompanies(): Promise<Array<{ companyId: string; locationIds
             lastName: firstContact.lastName,
             email: firstContact.email,
             phone: firstContact.phone,
-            isMainContact: true,
           },
         },
       }
@@ -489,20 +513,29 @@ async function createPriceListsAndCatalogs(
           parent: {
             adjustment: {
               type: "PERCENTAGE_DECREASE",
-              value: company.discount.toString(),
+              value: company.discount,
             },
           },
         },
       }
     );
 
-    if (!plData.priceListCreate.priceList) {
-      console.warn(`  ⚠ PriceList for ${company.name}: ${plData.priceListCreate.userErrors.map(e => e.message).join(", ")}`);
-      await sleep(500);
-      continue;
-    }
+    let priceListId = plData.priceListCreate.priceList?.id;
 
-    const priceListId = plData.priceListCreate.priceList.id;
+    if (!priceListId) {
+      // Price list already exists — fetch all and match by name
+      const existing = await graphql<{ priceLists: { edges: Array<{ node: { id: string; name: string } }> } }>(
+        `query { priceLists(first: 20) { edges { node { id name } } } }`
+      ).catch(() => ({ priceLists: { edges: [] } }));
+      const targetName = `${company.name} Pricing`;
+      priceListId = existing.priceLists.edges.find(e => e.node.name === targetName)?.node.id;
+      if (!priceListId) {
+        console.warn(`  ⚠ Could not find price list "${targetName}", skipping catalog`);
+        await sleep(500);
+        continue;
+      }
+      console.log(`  ↩ Reusing existing price list: ${targetName}`);
+    }
     console.log(`  ✓ Price list: ${company.name} Pricing (${company.discount}% discount)`);
 
     // Create catalog
@@ -523,7 +556,7 @@ async function createPriceListsAndCatalogs(
           title: `${company.name} Catalog`,
           status: "ACTIVE",
           priceListId,
-          contextsToAdd: {
+          context: {
             companyLocationIds: company.locationIds,
           },
         },
@@ -546,10 +579,40 @@ async function main() {
   console.log(`   Store: ${STORE_DOMAIN}`);
   console.log(`   API:   ${API_VERSION}\n`);
 
+  const skipTo = process.argv[2]; // "companies" or "pricing" to skip earlier steps
+
   try {
-    const collectionIds = await createCollections();
-    await createProducts(collectionIds);
-    const companies = await createCompanies();
+    let collectionIds: Record<string, string> = {};
+    if (!skipTo) {
+      collectionIds = await createCollections();
+      await createProducts(collectionIds);
+    } else {
+      console.log("⏭  Skipping collections & products");
+    }
+
+    let companies: Array<{ companyId: string; locationIds: string[]; name: string; discount: number }> = [];
+    if (skipTo === "pricing") {
+      // Fetch existing companies from Shopify
+      console.log("\n🔍 Fetching existing companies...");
+      const data = await graphql<{ companies: { edges: Array<{ node: { id: string; name: string; locations: { edges: Array<{ node: { id: string } }> } } }> } }>(
+        `query { companies(first: 10) { edges { node { id name locations(first: 5) { edges { node { id } } } } } } }`
+      );
+      const discountMap: Record<string, number> = {
+        "Acme Electric Supply": 20,
+        "Metro Contractors LLC": 15,
+        "Pacific Installations Inc": 10,
+      };
+      companies = data.companies.edges.map(({ node }) => ({
+        companyId: node.id,
+        name: node.name,
+        locationIds: node.locations.edges.map(e => e.node.id),
+        discount: discountMap[node.name] ?? 10,
+      }));
+      console.log(`  Found ${companies.length} companies`);
+    } else {
+      companies = await createCompanies();
+    }
+
     await createPriceListsAndCatalogs(companies);
 
     console.log("\n✅ Seeding complete!");
