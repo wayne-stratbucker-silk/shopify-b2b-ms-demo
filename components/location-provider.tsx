@@ -113,7 +113,7 @@ export function LocationProvider({
   }, []);
 
   useEffect(() => {
-    fetch("/api/bc/locations")
+    fetch("/api/shopify/locations")
       .then((r) => r.json())
       .then((d: { locations?: BCLocation[] }) => setLocations(d.locations ?? []))
       .catch(() => {});

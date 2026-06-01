@@ -92,7 +92,7 @@ function ProductCarousel(props: any) {
   useEffect(() => {
     if (!selectedSkus.length) { setLoading(false); return; }
     setLoading(true);
-    fetch(`/api/bc/products?skus=${encodeURIComponent(selectedSkus.join(","))}`)
+    fetch(`/api/shopify/products?skus=${encodeURIComponent(selectedSkus.join(","))}`)
       .then((r) => r.json())
       .then((data: { products?: BCProduct[] }) => {
         // Only finished SKUs render. A parent SKU of a variant product comes

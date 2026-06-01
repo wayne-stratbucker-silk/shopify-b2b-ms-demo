@@ -42,7 +42,7 @@ function useJobProducts(jobs: JobDef[]) {
   useEffect(() => {
     if (!allSkus.length) return;
     setLoading(true);
-    fetch(`/api/bc/products?skus=${encodeURIComponent(skuKey)}`)
+    fetch(`/api/shopify/products?skus=${encodeURIComponent(skuKey)}`)
       .then((r) => r.json())
       .then((data: { products?: Array<{ sku: string; name: string; price: string; imageUrl?: string; variants?: Array<{ sku: string }> }> }) => {
         const map: Record<string, ProductInfo> = {};

@@ -2,73 +2,79 @@
 
 import { useState, useEffect } from "react";
 import { runtime } from "@/lib/makeswift/runtime";
-import { Style, TextInput, List, Shape, Select } from "@makeswift/runtime/controls";
+import { Style, TextInput, List, Shape, Select, Combobox } from "@makeswift/runtime/controls";
 import { MSImage } from "@/components/makeswift/ms-image";
 
-interface BCCategory {
-  id: number;
-  slug: string;
+interface ShopifyCollection {
+  id: string;
   name: string;
-  imageUrl: string;
+  slug: string;
+  url: string;
+  image?: { url: string; altText?: string };
 }
 
-const CATEGORY_OPTIONS = [
-  { label: "LED Fixtures",       value: "led-fixtures" },
-  { label: "Lamps & Bulbs",      value: "lamps-bulbs" },
-  { label: "Controls & Sensors", value: "controls-sensors" },
-  { label: "Exit & Emergency",   value: "exit-emergency" },
-  { label: "Outdoor & Area",     value: "outdoor-area" },
-  { label: "Wiring Devices",     value: "wiring-devices" },
-  { label: "Conduit & Raceway",  value: "conduit-raceway" },
-  { label: "Wire & Cable",       value: "wire-cable" },
-];
+// Combobox value stored per item in the Makeswift builder.
+type CollectionRef = { handle: string; name: string };
 
-const DEFAULT_SLUGS = CATEGORY_OPTIONS.map((o) => o.value);
+interface CategoryItem {
+  collection?: CollectionRef;
+  count?: string;
+}
+
+async function collectionOptions(query: string) {
+  try {
+    const res = await fetch("/api/shopify/collections");
+    const collections: ShopifyCollection[] = await res.json();
+    const q = query.trim().toLowerCase();
+    const opts = collections.map((c) => ({
+      id: c.slug,
+      label: c.name,
+      value: { handle: c.slug, name: c.name } as CollectionRef,
+    }));
+    return q ? opts.filter((o) => o.label.toLowerCase().includes(q)) : opts;
+  } catch {
+    return [];
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CategoryGrid(props: any) {
   const { heading, subheading, categories: catsProp, cols, className } = props as {
     heading?: string;
     subheading?: string;
-    categories?: Array<{ slug?: string; count?: string }>;
+    categories?: CategoryItem[];
     cols?: string;
     className?: string;
   };
 
-  const [bcData, setBcData] = useState<Record<string, BCCategory> | null>(null);
+  const [collectionData, setCollectionData] = useState<Record<string, ShopifyCollection>>({});
 
   useEffect(() => {
-    fetch("/api/bc/categories")
+    fetch("/api/shopify/collections")
       .then((r) => r.json())
-      .then((data: BCCategory[]) => {
-        const map: Record<string, BCCategory> = {};
-        for (const cat of data) {
-          if (cat.slug) map[cat.slug] = cat;
-        }
-        setBcData(map);
+      .then((data: ShopifyCollection[]) => {
+        const map: Record<string, ShopifyCollection> = {};
+        for (const c of data) map[c.slug] = c;
+        setCollectionData(map);
       })
-      .catch(() => setBcData({}));
+      .catch(() => setCollectionData({}));
   }, []);
 
-  const selectedSlugs = catsProp?.length
-    ? catsProp.map((c) => c.slug ?? "").filter(Boolean)
-    : DEFAULT_SLUGS;
+  const selectedHandles = catsProp?.length
+    ? catsProp.map((c) => c.collection?.handle ?? "").filter(Boolean)
+    : Object.keys(collectionData);
 
-  const cats = selectedSlugs.map((slug, i) => {
-    const bc = bcData?.[slug];
-    const label = CATEGORY_OPTIONS.find((o) => o.value === slug)?.label ??
-      slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const cats = selectedHandles.map((handle, i) => {
+    const col = collectionData[handle];
+    const label = col?.name ?? handle.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     return {
-      slug,
-      name: bc?.name ?? label,
-      imageUrl: bc?.imageUrl ?? "",
+      handle,
+      name: label,
+      imageUrl: col?.image?.url ?? "",
       count: catsProp?.[i]?.count ?? "",
     };
   });
 
-  // Desktop column count drives the base .g{N} class; mobile rules in
-  // globals.css (`.acme-cat-grid` at ≤900/768/480) override the mobile layout
-  // so we don't need an inline gridTemplateColumns.
   const colCount = parseInt(cols ?? "4", 10);
   const gClass = `g${colCount}`;
 
@@ -92,8 +98,8 @@ function CategoryGrid(props: any) {
         <div className={`acme-cat-grid ${gClass}`}>
           {cats.map((c, i) => (
             <a
-              key={c.slug ?? i}
-              href={`/category/${c.slug ?? ""}`}
+              key={c.handle ?? i}
+              href={c.handle ? `/${c.handle}` : "#"}
               className="cat-tile"
               style={{ position: "relative" }}
               aria-label={c.name}
@@ -151,29 +157,19 @@ runtime.registerComponent(CategoryGrid, {
       defaultValue: "4",
     }),
     categories: List({
-      label: "Categories (leave empty to show all)",
+      label: "Collections (leave empty to show all)",
       type: Shape({
         type: {
-          slug: Select({
-            label: "Category",
-            options: [
-              { label: "LED Fixtures",       value: "led-fixtures" },
-              { label: "Lamps & Bulbs",      value: "lamps-bulbs" },
-              { label: "Controls & Sensors", value: "controls-sensors" },
-              { label: "Exit & Emergency",   value: "exit-emergency" },
-              { label: "Outdoor & Area",     value: "outdoor-area" },
-              { label: "Wiring Devices",     value: "wiring-devices" },
-              { label: "Conduit & Raceway",  value: "conduit-raceway" },
-              { label: "Wire & Cable",       value: "wire-cable" },
-            ],
-            defaultValue: "led-fixtures",
+          collection: Combobox({
+            label: "Collection",
+            getOptions: collectionOptions,
           }),
           count: TextInput({ label: "SKU count label (optional, e.g. 1,200+)" }),
         },
       }),
       getItemLabel: (item) => {
-        const slug = (item as { slug?: string })?.slug ?? "";
-        return CATEGORY_OPTIONS.find((o) => o.value === slug)?.label ?? (slug || "Category");
+        const ref = (item as unknown as { collection?: CollectionRef })?.collection;
+        return ref?.name ?? "Select a collection";
       },
     }),
   },

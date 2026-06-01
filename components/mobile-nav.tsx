@@ -104,7 +104,7 @@ export default function MobileMegaNav({ open, onClose, title = "Browse", tree: t
 
   useEffect(() => {
     if (treeProp) return;
-    fetch("/api/bc/categories/tree")
+    fetch("/api/shopify/collections")
       .then((r) => r.json())
       .then((data: NavNode[]) => {
         if (Array.isArray(data)) setFetched(data);

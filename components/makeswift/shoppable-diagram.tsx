@@ -107,7 +107,7 @@ function useJobProducts(jobs: JobDef[]) {
     }
     const ctrl = new AbortController();
     setLoading(true);
-    fetch(`/api/bc/products?skus=${encodeURIComponent(skuKey)}`, {
+    fetch(`/api/shopify/products?skus=${encodeURIComponent(skuKey)}`, {
       signal: ctrl.signal,
     })
       .then((r) => r.json() as Promise<ProductsApiResponse>)

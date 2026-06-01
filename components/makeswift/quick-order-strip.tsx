@@ -144,7 +144,7 @@ function QuickOrderStrip(props: any) {
     }
     setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, status: "loading" } : r));
     try {
-      const res = await fetch(`/api/bc/products?skus=${encodeURIComponent(sku.trim())}`);
+      const res = await fetch(`/api/shopify/products?skus=${encodeURIComponent(sku.trim())}`);
       const data = await res.json() as {
         products?: Array<{
           sku: string; name: string;
@@ -332,7 +332,7 @@ function QuickOrderStrip(props: any) {
     if (!clipboardSkus.length) return;
     setPasteLoading(true);
     try {
-      const res = await fetch(`/api/bc/products?skus=${encodeURIComponent(clipboardSkus.join(","))}`);
+      const res = await fetch(`/api/shopify/products?skus=${encodeURIComponent(clipboardSkus.join(","))}`);
       const data = await res.json() as {
         products?: Array<{ sku: string; name: string; brand?: string; stock?: number; unitPriceRaw?: number; listPriceRaw?: number }>
       };

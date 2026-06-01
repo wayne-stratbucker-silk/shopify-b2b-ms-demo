@@ -14,17 +14,18 @@ import type { MSLink } from "@/lib/makeswift/link";
 
 // ─── Header navigation (Makeswift wrapper) ──────────────────────────────────
 //
-// The category taxonomy comes LIVE from BigCommerce. There are two layers:
+// The collection list comes LIVE from Shopify. There are two layers:
 //
-//   • "All Categories" launcher — always reflects the FULL live BC tree, with
-//     zero Makeswift input. Add/rename a category in BC and it appears here.
-//   • Pinned categories — an optional curated subset the admin selects from
-//     the existing BC categories (searchable dropdown). These render as the
-//     bar items beside "All Categories". Leave empty to show every category.
+//   • "All Categories" launcher — always reflects the FULL live Shopify
+//     collection list, with zero Makeswift input. Add/rename a collection in
+//     Shopify and it appears here.
+//   • Pinned collections — an optional curated subset the admin selects from
+//     the existing Shopify collections (searchable dropdown). These render as
+//     the bar items beside "All Categories". Leave empty to show every collection.
 //   • Content pages — right-aligned links to authored content/marketing pages.
 //     Each may carry an optional list of sub-links, rendered as a two-level
 //     dropdown. Content pages always stay visible — they never collapse into
-//     the categories' "More" overflow.
+//     the collections' "More" overflow.
 
 // Combobox value — a plain object so it satisfies Makeswift's JSON `Data`
 // constraint. `id` is the BC category id; `name` is the path label kept so the
@@ -100,13 +101,12 @@ function HeaderNav({
 
 // ─── Makeswift registration ────────────────────────────────────────────────
 
-// Flatten the live BC category tree into searchable options for the builder.
+// Flatten the live Shopify collections into searchable options for the builder.
 // Runs client-side inside the Makeswift host iframe, so the relative fetch
-// resolves against the storefront origin. Nested categories are shown with a
-// "Parent › Child" path so the admin can pin a department or a subcategory.
+// resolves against the storefront origin.
 async function categoryOptions(query: string) {
   try {
-    const res = await fetch("/api/bc/categories/tree");
+    const res = await fetch("/api/shopify/collections");
     const tree = await res.json();
     const opts: { id: string; label: string; value: CategoryRef }[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
