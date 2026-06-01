@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { getCart } from "@/lib/shopify/queries/cart";
 import Link from "next/link";
+import Image from "next/image";
 
 const CART_COOKIE = "shopify_cart_id";
 
@@ -48,7 +49,7 @@ export default async function CartPage() {
           {cart.lines.edges.map(({ node: line }) => (
             <div key={line.id} className="card" style={{ display: "flex", gap: 16, marginBottom: 12, padding: 16, alignItems: "center" }}>
               {line.merchandise.product.featuredImage && (
-                <img src={line.merchandise.product.featuredImage.url} alt={line.merchandise.product.featuredImage.altText ?? ""} style={{ width: 80, height: 80, objectFit: "contain", borderRadius: 4 }} />
+                <Image src={line.merchandise.product.featuredImage.url} alt={line.merchandise.product.featuredImage.altText ?? ""} width={80} height={80} style={{ objectFit: "contain", borderRadius: 4 }} />
               )}
               <div style={{ flex: 1 }}>
                 <div className="text-h4" style={{ fontWeight: 600 }}>{line.merchandise.product.title}</div>

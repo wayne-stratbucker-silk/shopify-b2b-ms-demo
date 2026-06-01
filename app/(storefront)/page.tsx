@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Page } from "@makeswift/runtime/next";
 import { getSiteVersion } from "@makeswift/runtime/next/server";
 import { client } from "@/lib/makeswift/client";
@@ -44,9 +45,9 @@ export default async function HomePage() {
           <p style={{ fontSize: 18, opacity: 0.85, marginBottom: 32 }}>
             Net 30 terms · Same-day ship · Tiered B2B pricing
           </p>
-          <a href="/collections/wire-cable" className="btn btn-lg" style={{ background: "#fff", color: "var(--primary)" }}>
+          <Link href="/collections/wire-cable" className="btn btn-lg" style={{ background: "#fff", color: "var(--primary)" }}>
             Shop Now
-          </a>
+          </Link>
         </div>
       </section>
 

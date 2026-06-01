@@ -29,7 +29,7 @@ export async function GET(req: Request) {
   jar.delete("oauth_return_to");
 
   try {
-    const { accessToken, idToken } = await exchangeCodeForTokens(code);
+    const { idToken } = await exchangeCodeForTokens(code);
 
     // Decode the ID token to get the customer ID
     const decoded = await jwtVerify(idToken, async () => {

@@ -109,6 +109,7 @@ async function categoryOptions(query: string) {
     const res = await fetch("/api/bc/categories/tree");
     const tree = await res.json();
     const opts: { id: string; label: string; value: CategoryRef }[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const walk = (nodes: any[], prefix: string) => {
       for (const n of nodes ?? []) {
         const id = String(n.id);

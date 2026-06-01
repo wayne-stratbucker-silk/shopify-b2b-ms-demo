@@ -5,7 +5,7 @@ import { getList } from "@/lib/lists/client";
 
 export const dynamic = "force-dynamic";
 
-const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+
 
 interface Props { params: Promise<{ listId: string }> }
 

@@ -108,7 +108,7 @@ export default function NewQuotePage() {
           <button type="submit" disabled={loading} className="btn btn-primary">
             {loading ? "Submitting…" : "Submit Quote Request"}
           </button>
-          <a href="/account/quotes" className="btn">Cancel</a>
+          <button type="button" className="btn" onClick={() => window.location.href = "/account/quotes"}>Cancel</button>
         </div>
       </form>
     </div>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { adminQuery } from "@/lib/shopify/admin-client";
 import type { Quote, QuoteItem, QuoteMessage, QuoteStatus, QuoteStatusKind } from "@/types";
 
