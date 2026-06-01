@@ -1,0 +1,174 @@
+import { storefrontQuery, type BuyerContext } from "@/lib/shopify/storefront-client";
+import type { ShopifyProduct, ShopifyCollection } from "@/types";
+
+const PRODUCT_FIELDS = `
+  id
+  handle
+  title
+  vendor
+  descriptionHtml
+  tags
+  featuredImage { url altText }
+  images(first: 8) {
+    edges { node { url altText } }
+  }
+  priceRange {
+    minVariantPrice { amount currencyCode }
+  }
+  compareAtPriceRange {
+    minVariantPrice { amount currencyCode }
+  }
+  variants(first: 50) {
+    edges {
+      node {
+        id
+        sku
+        title
+        availableForSale
+        quantityAvailable
+        price { amount currencyCode }
+        compareAtPrice { amount currencyCode }
+        selectedOptions { name value }
+        quantityRules {
+          minimum
+          maximum
+          increment
+        }
+      }
+    }
+  }
+  metafields(identifiers: [
+    { namespace: "custom", key: "uom" },
+    { namespace: "custom", key: "lead_time" },
+    { namespace: "custom", key: "spec_sheet_url" },
+    { namespace: "custom", key: "install_guide_url" },
+    { namespace: "custom", key: "cad_file_url" }
+  ]) {
+    namespace
+    key
+    value
+  }
+`;
+
+export async function getProduct(handle: string, buyer?: BuyerContext): Promise<ShopifyProduct | null> {
+  const data = await storefrontQuery<{ product: ShopifyProduct | null }>(
+    `query GetProduct($handle: String!) {
+      product(handle: $handle) { ${PRODUCT_FIELDS} }
+    }`,
+    { handle },
+    buyer,
+    [`product:${handle}`],
+  );
+  return data.product;
+}
+
+export async function getCollectionProducts(
+  handle: string,
+  first = 24,
+  after?: string,
+  buyer?: BuyerContext,
+): Promise<ShopifyCollection | null> {
+  const data = await storefrontQuery<{ collection: ShopifyCollection | null }>(
+    `query GetCollectionProducts($handle: String!, $first: Int!, $after: String) {
+      collection(handle: $handle) {
+        id handle title description
+        image { url altText }
+        products(first: $first, after: $after, sortKey: BEST_SELLING) {
+          edges { node { ${PRODUCT_FIELDS} } }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }`,
+    { handle, first, after },
+    buyer,
+    [`collection:${handle}`],
+  );
+  return data.collection;
+}
+
+export async function getFeaturedProducts(first = 12, buyer?: BuyerContext): Promise<ShopifyProduct[]> {
+  const data = await storefrontQuery<{
+    products: { edges: Array<{ node: ShopifyProduct }> };
+  }>(
+    `query GetFeaturedProducts($first: Int!) {
+      products(first: $first, sortKey: BEST_SELLING) {
+        edges { node { ${PRODUCT_FIELDS} } }
+      }
+    }`,
+    { first },
+    buyer,
+    ["products:featured"],
+  );
+  return data.products.edges.map((e) => e.node);
+}
+
+export async function getProductsByVendor(vendor: string, first = 24, buyer?: BuyerContext): Promise<ShopifyProduct[]> {
+  const data = await storefrontQuery<{
+    products: { edges: Array<{ node: ShopifyProduct }> };
+  }>(
+    `query GetProductsByVendor($query: String!, $first: Int!) {
+      products(first: $first, query: $query) {
+        edges { node { ${PRODUCT_FIELDS} } }
+      }
+    }`,
+    { query: `vendor:${vendor}`, first },
+    buyer,
+    [`products:vendor:${vendor}`],
+  );
+  return data.products.edges.map((e) => e.node);
+}
+
+export async function getProductBySku(sku: string): Promise<ShopifyProduct | null> {
+  const data = await storefrontQuery<{
+    products: { edges: Array<{ node: ShopifyProduct }> };
+  }>(
+    `query GetProductBySku($query: String!) {
+      products(first: 1, query: $query) {
+        edges { node { ${PRODUCT_FIELDS} } }
+      }
+    }`,
+    { query: `sku:${sku}` },
+  );
+  return data.products.edges[0]?.node ?? null;
+}
+
+export async function validateSkus(skus: string[]): Promise<Map<string, ShopifyProduct>> {
+  const query = skus.map((s) => `sku:${s}`).join(" OR ");
+  const data = await storefrontQuery<{
+    products: { edges: Array<{ node: ShopifyProduct }> };
+  }>(
+    `query ValidateSkus($query: String!) {
+      products(first: 50, query: $query) {
+        edges { node { id handle title vendor variants(first: 10) {
+          edges { node { id sku availableForSale price { amount currencyCode } } }
+        } } }
+      }
+    }`,
+    { query },
+  );
+  const result = new Map<string, ShopifyProduct>();
+  for (const { node } of data.products.edges) {
+    for (const variantEdge of node.variants.edges) {
+      if (skus.includes(variantEdge.node.sku)) {
+        result.set(variantEdge.node.sku, node);
+      }
+    }
+  }
+  return result;
+}
+
+export async function getCollections(first = 20): Promise<Array<{ id: string; handle: string; title: string; image?: { url: string; altText?: string }; description?: string }>> {
+  const data = await storefrontQuery<{
+    collections: { edges: Array<{ node: { id: string; handle: string; title: string; description?: string; image?: { url: string; altText?: string } } }> };
+  }>(
+    `query GetCollections($first: Int!) {
+      collections(first: $first) {
+        edges { node { id handle title description image { url altText } } }
+      }
+    }`,
+    { first },
+    undefined,
+    ["collections"],
+  );
+  return data.collections.edges.map((e) => e.node);
+}
