@@ -4,9 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "type-check": "tsc --noEmit",
+    "seed": "npx dotenv -e .env.local tsx scripts/shopify-seed.mts",
+    "algolia-sync": "npx dotenv -e .env.local tsx scripts/algolia-sync.mts",
+    "register-webhooks": "npx dotenv -e .env.local tsx scripts/register-webhooks.mts"
   },
   "dependencies": {
     "@algolia/autocomplete-js": "^1.19.8",
@@ -32,9 +36,11 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/sanitize-html": "^2.16.1",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "15.5.18",
     "tailwindcss": "^3.4.19",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }
