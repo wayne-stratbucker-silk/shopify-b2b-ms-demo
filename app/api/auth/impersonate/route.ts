@@ -65,5 +65,3 @@ export async function GET() {
     company: session.companyName,
   });
 }
-
-export { decodeSession }; // re-exported so end route can import from same module without duplication
