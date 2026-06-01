@@ -10,11 +10,8 @@ export function mapProduct(shopifyProduct: ShopifyProduct, customerSku?: string)
 
   const images = shopifyProduct.images.edges.map((e) => e.node.url);
 
-  const tiers = shopifyProduct.variants.edges.flatMap((e) => {
-    const rules = (e.node as unknown as { quantityRules?: { minimum?: number; maximum?: number; increment?: number } }).quantityRules;
-    if (!rules?.minimum || rules.minimum <= 1) return [];
-    return [{ minQty: rules.minimum, unitPrice: parseFloat(e.node.price.amount) }];
-  }).filter((t, i, arr) => arr.findIndex((x) => x.minQty === t.minQty) === i);
+  // quantityRules is a Shopify Plus B2B feature not available via Storefront API on all plans
+  const tiers: Array<{ minQty: number; unitPrice: number }> = [];
 
   const inStock = shopifyProduct.variants.edges.some((e) => e.node.availableForSale);
   const totalQty = shopifyProduct.variants.edges.reduce(

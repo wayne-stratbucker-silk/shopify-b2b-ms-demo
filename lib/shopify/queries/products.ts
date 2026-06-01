@@ -29,11 +29,6 @@ const PRODUCT_FIELDS = `
         price { amount currencyCode }
         compareAtPrice { amount currencyCode }
         selectedOptions { name value }
-        quantityRules {
-          minimum
-          maximum
-          increment
-        }
       }
     }
   }
