@@ -57,6 +57,8 @@ interface Props {
   /** Right-aligned trailing content (freight pill, store-pickup link, etc). */
   tail?: React.ReactNode;
   compact?: boolean;
+  /** Shopify menu handle to fetch hierarchy from (default "main-menu"). */
+  menuHandle?: string;
   /** Show the "All Categories" launcher on the left (default true). */
   showAnchor?: boolean;
   /** Extra class on the bar root (e.g. Makeswift Style positioning). */
@@ -118,6 +120,7 @@ export default function MegaNav({
   featured = {},
   tail,
   compact,
+  menuHandle = "main-menu",
   showAnchor = true,
   className,
 }: Props) {
@@ -142,16 +145,16 @@ export default function MegaNav({
   // BACK — as the viewport widens. Without this the bar could only shrink.
   const itemWidths = useRef<number[]>([]);
 
-  // Pull the live collection list unless a tree was passed in.
+  // Pull the live menu tree unless a tree was passed in.
   useEffect(() => {
     if (treeProp) return;
-    fetch("/api/shopify/collections")
+    fetch(`/api/shopify/menu?handle=${encodeURIComponent(menuHandle)}`)
       .then((r) => r.json())
       .then((data: NavNode[]) => {
         if (Array.isArray(data)) setFetched(data);
       })
       .catch(() => {});
-  }, [treeProp]);
+  }, [treeProp, menuHandle]);
 
   // Bar items: the admin-pinned subset (resolved from the live tree, in order)
   // when configured, otherwise every top-level category.

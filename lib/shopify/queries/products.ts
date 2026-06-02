@@ -188,3 +188,57 @@ export async function getCollections(first = 20): Promise<Array<{ id: string; ha
   );
   return data.collections.edges.map((e) => e.node);
 }
+
+// ─── Menu / Navigation ───────────────────────────────────────────────────────
+
+interface ShopifyMenuItem {
+  id: string;
+  title: string;
+  url: string;
+  type: string;
+  items: ShopifyMenuItem[];
+}
+
+// NavNode shape kept local to avoid a circular import with mega-nav.tsx.
+export interface MenuNavNode {
+  id: string;
+  name: string;
+  slug: string;
+  url: string;
+  children?: MenuNavNode[];
+}
+
+function menuItemToNavNode(item: ShopifyMenuItem): MenuNavNode {
+  let url = item.url;
+  try { url = new URL(item.url).pathname; } catch {}
+  const slug = url.split("/").filter(Boolean).pop() ?? "";
+  return {
+    id: item.id,
+    name: item.title,
+    slug,
+    url,
+    children: item.items?.length ? item.items.map(menuItemToNavNode) : undefined,
+  };
+}
+
+export async function getMenu(handle: string): Promise<MenuNavNode[]> {
+  const data = await storefrontQuery<{
+    menu: { items: ShopifyMenuItem[] } | null;
+  }>(
+    `query GetMenu($handle: String!) {
+      menu(handle: $handle) {
+        items {
+          id title url type
+          items {
+            id title url type
+            items { id title url type }
+          }
+        }
+      }
+    }`,
+    { handle },
+    undefined,
+    [`menu:${handle}`],
+  );
+  return data.menu?.items.map(menuItemToNavNode) ?? [];
+}
