@@ -28,6 +28,7 @@ export interface Product {
   price: number;
   listPrice: number;
   wasSalePrice?: number;
+  msrp?: number;
   uom: string;                // unit of measure from product metafield
   stockQty: number;
   leadTime: string;

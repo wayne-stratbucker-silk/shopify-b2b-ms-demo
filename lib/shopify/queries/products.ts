@@ -41,7 +41,10 @@ const PRODUCT_FIELDS = `
     { namespace: "custom", key: "lead_time" },
     { namespace: "custom", key: "spec_sheet_url" },
     { namespace: "custom", key: "install_guide_url" },
-    { namespace: "custom", key: "cad_file_url" }
+    { namespace: "custom", key: "cad_file_url" },
+    { namespace: "custom", key: "product_specs" },
+    { namespace: "custom", key: "warranty" },
+    { namespace: "custom", key: "msrp" }
   ]) {
     namespace
     key

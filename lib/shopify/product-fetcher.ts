@@ -47,6 +47,17 @@ export function mapProduct(shopifyProduct: ShopifyProduct, customerSku?: string)
     specSheetUrl: getMeta("spec_sheet_url") || undefined,
     installGuideUrl: getMeta("install_guide_url") || undefined,
     cadFileUrl: getMeta("cad_file_url") || undefined,
+    specs: (() => {
+      const raw = getMeta("product_specs");
+      try { return raw ? (JSON.parse(raw) as Record<string, string>) : undefined; } catch { return undefined; }
+    })(),
+    warranty: getMeta("warranty") || undefined,
+    msrp: (() => {
+      const raw = getMeta("msrp");
+      if (!raw) return undefined;
+      const n = parseFloat(raw);
+      return !isNaN(n) && n > 0 ? n : undefined;
+    })(),
     trackInventory: true,
   };
 }
