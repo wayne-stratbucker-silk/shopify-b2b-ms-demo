@@ -83,23 +83,51 @@ interface CustomerInfo {
 export async function getCustomerWithCompany(customerId: string): Promise<CustomerInfo | null> {
   const gid = customerId.startsWith("gid://") ? customerId : `gid://shopify/Customer/${customerId}`;
 
-  const data = await adminQuery<{ customer: CustomerInfo | null }>(`
-    query GetCustomerWithCompany($id: ID!) {
+  // Step 1: basic customer lookup (always works with read_customers scope)
+  const basicData = await adminQuery<{ customer: { id: string; email: string; firstName: string; lastName: string } | null }>(`
+    query GetCustomer($id: ID!) {
       customer(id: $id) {
         id
         email
         firstName
         lastName
-        companyContacts(first: 1) {
-          edges {
-            node {
-              id
-              company { id name externalId }
-              roleAssignments(first: 10) {
-                edges {
-                  node {
-                    companyLocation { id name }
-                    role { name }
+      }
+    }
+  `, { id: gid });
+
+  if (!basicData.customer) return null;
+
+  // Step 2: try to fetch B2B company contacts (requires read_companies scope)
+  // If this fails due to missing scopes or non-B2B store, log and continue with empty contacts.
+  let companyContacts: CustomerInfo["companyContacts"] = [];
+  try {
+    type B2BData = {
+      customer: {
+        companyContacts: {
+          edges: Array<{
+            node: {
+              id: string;
+              company: { id: string; name: string; externalId?: string | null };
+              roleAssignments: { edges: Array<{ node: { companyLocation: { id: string; name: string }; role: { name: string } } }> };
+            };
+          }>;
+        };
+      } | null;
+    };
+    const b2bData = await adminQuery<B2BData>(`
+      query GetCustomerCompany($id: ID!) {
+        customer(id: $id) {
+          companyContacts(first: 1) {
+            edges {
+              node {
+                id
+                company { id name externalId }
+                roleAssignments(first: 10) {
+                  edges {
+                    node {
+                      companyLocation { id name }
+                      role { name }
+                    }
                   }
                 }
               }
@@ -107,37 +135,25 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
           }
         }
       }
+    `, { id: gid });
+
+    if (b2bData.customer) {
+      companyContacts = b2bData.customer.companyContacts.edges.map((e) => ({
+        id: e.node.id,
+        company: e.node.company,
+        roleAssignments: e.node.roleAssignments.edges.map((ra) => ({
+          companyLocation: ra.node.companyLocation,
+          role: ra.node.role,
+        })),
+      }));
     }
-  `, { id: gid });
+  } catch (e) {
+    console.warn("[customer-accounts] B2B company query failed (token may lack read_companies scope):", String(e));
+  }
 
-  if (!data.customer) return null;
-
-  // Flatten edges
   return {
-    ...data.customer,
-    companyContacts: (data.customer as unknown as {
-      companyContacts: { edges: Array<{ node: unknown }> }
-    }).companyContacts.edges.map((e: { node: unknown }) => {
-      const contact = e.node as {
-        id: string;
-        company: { id: string; name: string; externalId?: string | null };
-        roleAssignments: { edges: Array<{ node: unknown }> };
-      };
-      return {
-        id: contact.id,
-        company: contact.company,
-        roleAssignments: contact.roleAssignments.edges.map((ra: { node: unknown }) => {
-          const assignment = ra.node as {
-            companyLocation: { id: string; name: string };
-            role: { name: string };
-          };
-          return {
-            companyLocation: assignment.companyLocation,
-            role: assignment.role,
-          };
-        }),
-      };
-    }),
+    ...basicData.customer,
+    companyContacts,
   };
 }
 
