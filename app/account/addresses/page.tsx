@@ -49,40 +49,46 @@ export default async function AddressesPage() {
 
   return (
     <div>
-      <h1 className="text-h1" style={{ marginBottom: 8 }}>Company Locations</h1>
-      <p className="text-sm" style={{ color: "var(--muted)", marginBottom: 24 }}>
-        Shipping addresses are managed per company location.
-      </p>
+      <div className="page-h">
+        <div>
+          <h1>Company locations</h1>
+          <p className="sub">Shipping addresses are managed per company location.</p>
+        </div>
+      </div>
 
       {locations.length === 0 ? (
-        <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+        <div className="card" style={{ padding: "40px 16px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
           No locations found.
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+        <div className="g3 addr-grid">
           {locations.map(loc => {
             const addr = loc.shippingAddress;
             return (
-              <div key={loc.id} className="card" style={{ padding: 20 }}>
-                <div className="text-h4" style={{ fontWeight: 600, marginBottom: 8 }}>{loc.name}</div>
-                {addr ? (
-                  <div className="text-sm" style={{ lineHeight: 1.7, color: "var(--ink-2)" }}>
-                    {addr.address1 && <div>{addr.address1}</div>}
-                    {addr.address2 && <div>{addr.address2}</div>}
-                    {(addr.city || addr.zoneCode || addr.zip) && (
-                      <div>{[addr.city, addr.zoneCode, addr.zip].filter(Boolean).join(", ")}</div>
-                    )}
-                    {addr.countryCode && <div>{addr.countryCode}</div>}
-                    {addr.phone && <div style={{ color: "var(--muted)", marginTop: 4 }}>{addr.phone}</div>}
-                  </div>
-                ) : (
-                  <p className="text-sm" style={{ color: "var(--muted)" }}>No address on file</p>
-                )}
-                {loc.billingSameAsShipping && (
-                  <div className="text-xs" style={{ color: "var(--muted-2)", marginTop: 8 }}>
-                    Billing same as shipping
-                  </div>
-                )}
+              <div key={loc.id} className="card">
+                <div className="card-h">
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{loc.name}</span>
+                  {loc.billingSameAsShipping && (
+                    <span className="status status-info" style={{ fontSize: 11 }}>Billing = Shipping</span>
+                  )}
+                </div>
+                <div className="card-b">
+                  {addr ? (
+                    <div style={{ fontSize: 13, lineHeight: 1.7, color: "var(--ink-2)" }}>
+                      {addr.address1 && <div>{addr.address1}</div>}
+                      {addr.address2 && <div>{addr.address2}</div>}
+                      {(addr.city || addr.zoneCode || addr.zip) && (
+                        <div>{[addr.city, addr.zoneCode, addr.zip].filter(Boolean).join(", ")}</div>
+                      )}
+                      {addr.countryCode && <div>{addr.countryCode}</div>}
+                      {addr.phone && (
+                        <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>{addr.phone}</div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="muted" style={{ fontSize: 13 }}>No address on file</p>
+                  )}
+                </div>
               </div>
             );
           })}

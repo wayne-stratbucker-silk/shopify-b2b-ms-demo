@@ -18,35 +18,59 @@ export default async function ListsPage() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <h1 className="text-h1">Shopping Lists</h1>
-        <form action="/api/lists" method="POST" style={{ display: "flex", gap: 8 }}>
+      <div className="page-h">
+        <div>
+          <h1>Shopping lists</h1>
+        </div>
+        <form action="/api/lists" method="POST" className="row" style={{ gap: 8 }}>
           <input
             name="name"
             required
             placeholder="New list name"
-            style={{ padding: "8px 12px", border: "1px solid var(--line)", borderRadius: "var(--radius)", fontSize: 14 }}
+            className="input"
           />
-          <button type="submit" className="btn btn-primary">+ Create</button>
+          <button type="submit" className="btn">+ Create</button>
         </form>
       </div>
 
       {lists.length === 0 ? (
-        <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
-          No lists yet. Create one to save products for quick reordering.
+        <div className="card" style={{ padding: "40px 16px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+          No lists yet. Create one above to save products for quick reordering.
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-          {lists.map(list => (
-            <Link key={list.id} href={`/account/lists/${encodeURIComponent(list.id)}`} className="card card-h" style={{ padding: 20, textDecoration: "none" }}>
-              <div className="text-h4" style={{ fontWeight: 600, marginBottom: 4 }}>{list.name}</div>
-              {list.note && <p className="text-sm" style={{ color: "var(--muted)", marginBottom: 4 }}>{list.note}</p>}
-              <p className="text-xs" style={{ color: "var(--muted-2)" }}>
-                {list.items} item{list.items !== 1 ? "s" : ""} · Updated {fmtDate(list.lastUsed)}
-              </p>
-            </Link>
-          ))}
-        </div>
+        <table className="tbl tbl-mobile-cards">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th className="col-hide">Items</th>
+              <th className="col-meta">Last updated</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {lists.map(list => (
+              <tr key={list.id}>
+                <td className="col-primary">
+                  <Link href={`/account/lists/${encodeURIComponent(list.id)}`} className="tbl row-link">
+                    {list.name}
+                  </Link>
+                  {list.note && (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{list.note}</div>
+                  )}
+                </td>
+                <td className="col-hide mono" style={{ fontSize: 12 }}>
+                  {list.items} item{list.items !== 1 ? "s" : ""}
+                </td>
+                <td className="col-meta muted">{fmtDate(list.lastUsed)}</td>
+                <td className="col-action">
+                  <Link href={`/account/lists/${encodeURIComponent(list.id)}`} className="btn btn-ghost btn-xs">
+                    View
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

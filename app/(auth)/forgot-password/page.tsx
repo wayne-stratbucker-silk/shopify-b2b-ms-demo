@@ -1,39 +1,53 @@
-import Link from "next/link";
+import { MakeswiftComponent } from "@makeswift/runtime/next";
+import { getSiteVersion } from "@makeswift/runtime/next/server";
+import { client } from "@/lib/makeswift/client";
+import { ForgotPasswordForm } from "./forgot-password-form";
+import "@/components/makeswift/auth-marketing-panel";
 
-const STORE_DOMAIN = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN ?? "";
+const FORGOT_MARKETING_ID = "acme-b2b-forgot-marketing";
 
-export default function ForgotPasswordPage() {
-  const accountUrl = `https://${STORE_DOMAIN}/account`;
+export default async function ForgotPasswordPage() {
+  const snapshot = await client.getComponentSnapshot(FORGOT_MARKETING_ID, {
+    siteVersion: getSiteVersion(),
+  });
 
   return (
-    <div className="card" style={{ padding: 40 }}>
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <h1 className="text-h2" style={{ fontWeight: 700, marginBottom: 8 }}>Reset password</h1>
-        <p className="text-sm" style={{ color: "var(--muted)" }}>
-          We&apos;ll help you get back into your account
-        </p>
-      </div>
-
-      <div style={{ background: "var(--surface)", borderRadius: "var(--radius)", padding: 16, marginBottom: 24, fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
-        Password resets are handled through Shopify&apos;s secure account portal. Click below to access your account and request a password reset.
-      </div>
-
-      <a
-        href={accountUrl}
-        className="btn btn-primary btn-lg btn-block"
-        style={{ textAlign: "center", display: "block", cursor: "pointer" }}
-        target="_blank"
-        rel="noreferrer"
+    <>
+      {/* Left panel — chrome stays in code, content via Makeswift */}
+      <div
+        className="auth-panel-left"
+        style={{
+          flex: "0 0 480px",
+          background: "var(--primary)",
+          color: "#fff",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "64px 56px",
+          position: "relative",
+          overflow: "hidden",
+        }}
       >
-        Go to Shopify account portal →
-      </a>
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage:
+              "repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,transparent 1px 48px)," +
+              "repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 1px,transparent 1px 48px)",
+          }}
+        />
 
-      <p style={{ textAlign: "center", marginTop: 20, fontSize: 13, color: "var(--muted)" }}>
-        Remembered your password?{" "}
-        <Link href="/login" style={{ color: "var(--primary)", textDecoration: "underline" }}>
-          Sign in
-        </Link>
-      </p>
-    </div>
+        <MakeswiftComponent
+          snapshot={snapshot}
+          label="Forgot Password Marketing Panel"
+          type="acme/auth-marketing-panel"
+        />
+      </div>
+
+      {/* Right panel — form, code-controlled */}
+      <ForgotPasswordForm />
+    </>
   );
 }

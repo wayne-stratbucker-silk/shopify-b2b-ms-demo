@@ -92,69 +92,74 @@ export function UsersClient({ members: initial }: { members: Member[] }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <h1 className="text-h1">Team Members</h1>
-        <button className="btn btn-primary" onClick={() => { setShowInvite(true); setInviteSuccess(""); }}>
+      <div className="page-h">
+        <div>
+          <h1>Team members</h1>
+        </div>
+        <button className="btn btn-sm" onClick={() => { setShowInvite(true); setInviteSuccess(""); }}>
           + Invite member
         </button>
       </div>
 
       {inviteSuccess && (
-        <div style={{ background: "var(--success-fade, #f0fdf4)", border: "1px solid var(--success)", borderRadius: "var(--radius)", padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "var(--success)" }}>
+        <div className="alert alert-ok" style={{ marginBottom: 16 }}>
           ✓ {inviteSuccess}
         </div>
       )}
 
       {members.length === 0 ? (
-        <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+        <div className="card" style={{ padding: "40px 16px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
           No team members yet. Invite your first member above.
         </div>
       ) : (
-        <div className="card" style={{ overflow: "auto" }}>
-          <table className="tbl" style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Location</th>
-                <th style={{ width: 80 }} />
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m) => (
-                <tr key={m.id}>
-                  <td>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div className="av">{initials(m.name)}</div>
-                      <span style={{ fontWeight: 600 }}>
+        <table className="tbl tbl-mobile-cards">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th className="col-hide">Email</th>
+              <th className="col-status">Role</th>
+              <th className="col-hide">Location</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {members.map((m) => (
+              <tr key={m.id}>
+                <td className="col-primary">
+                  <div className="row" style={{ gap: 10, alignItems: "center" }}>
+                    <div className="av">{initials(m.name)}</div>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>
                         {m.name}
                         {m.isMainContact && (
-                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".04em" }}>· Main</span>
+                          <span className="muted" style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: ".04em" }}>· Main</span>
                         )}
-                      </span>
+                      </div>
+                      <div className="muted" style={{ fontSize: 12 }}>{m.email}</div>
                     </div>
-                  </td>
-                  <td className="text-sm">{m.email}</td>
-                  <td><span className={rolePillCls(m.role)}>{m.role}</span></td>
-                  <td className="text-sm">{m.location}</td>
-                  <td>
-                    {!m.isMainContact && (
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        style={{ color: "var(--danger)", fontSize: 12 }}
-                        onClick={() => handleRemove(m.id, m.email)}
-                        disabled={removingId === m.id}
-                      >
-                        {removingId === m.id ? "Removing…" : "Remove"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </td>
+                <td className="col-hide muted" style={{ fontSize: 13 }}>{m.email}</td>
+                <td className="col-status">
+                  <span className={rolePillCls(m.role)}>{m.role}</span>
+                </td>
+                <td className="col-hide muted" style={{ fontSize: 12 }}>{m.location}</td>
+                <td className="col-action">
+                  {!m.isMainContact && (
+                    <button
+                      className="btn btn-ghost btn-xs"
+                      style={{ color: "var(--danger)" }}
+                      onClick={() => handleRemove(m.id, m.email)}
+                      disabled={removingId === m.id}
+                    >
+                      {removingId === m.id ? "Removing…" : "Remove"}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
 
       {/* Invite dialog */}
@@ -163,58 +168,54 @@ export function UsersClient({ members: initial }: { members: Member[] }) {
           position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 900,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <div className="card" style={{ padding: 32, width: 400, maxWidth: "90vw" }}>
-            <h2 className="text-h3" style={{ fontWeight: 700, marginBottom: 20 }}>Invite team member</h2>
+          <div className="modal-card" style={{ padding: 32, width: 400, maxWidth: "90vw" }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 20px" }}>Invite team member</h2>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4, color: "var(--muted)" }}>
-                  FIRST NAME
-                </label>
+            <div className="auth-grid-2" style={{ marginBottom: 12 }}>
+              <div className="field">
+                <label htmlFor="invite-first">First name</label>
                 <input
+                  id="invite-first"
                   type="text"
+                  className="input"
                   value={inviteFirst}
                   onChange={(e) => setInviteFirst(e.target.value)}
                   placeholder="Jane"
-                  style={{ width: "100%", height: 36, border: "1px solid var(--line-2)", borderRadius: "var(--radius)", padding: "0 10px", fontSize: 13, background: "var(--bg)", color: "var(--ink)", boxSizing: "border-box" }}
                 />
               </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4, color: "var(--muted)" }}>
-                  LAST NAME
-                </label>
+              <div className="field">
+                <label htmlFor="invite-last">Last name</label>
                 <input
+                  id="invite-last"
                   type="text"
+                  className="input"
                   value={inviteLast}
                   onChange={(e) => setInviteLast(e.target.value)}
                   placeholder="Doe"
-                  style={{ width: "100%", height: 36, border: "1px solid var(--line-2)", borderRadius: "var(--radius)", padding: "0 10px", fontSize: 13, background: "var(--bg)", color: "var(--ink)", boxSizing: "border-box" }}
                 />
               </div>
             </div>
 
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4, color: "var(--muted)" }}>
-                WORK EMAIL *
-              </label>
+            <div className="field" style={{ marginBottom: 12 }}>
+              <label htmlFor="invite-email">Work email *</label>
               <input
+                id="invite-email"
                 type="email"
+                className="input"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="jane@company.com"
                 autoFocus
-                style={{ width: "100%", height: 36, border: "1px solid var(--line-2)", borderRadius: "var(--radius)", padding: "0 10px", fontSize: 13, background: "var(--bg)", color: "var(--ink)", boxSizing: "border-box" }}
               />
             </div>
 
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4, color: "var(--muted)" }}>
-                ROLE
-              </label>
+            <div className="field" style={{ marginBottom: 20 }}>
+              <label htmlFor="invite-role">Role</label>
               <select
+                id="invite-role"
+                className="select"
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value)}
-                style={{ width: "100%", height: 36, border: "1px solid var(--line-2)", borderRadius: "var(--radius)", padding: "0 10px", fontSize: 13, background: "var(--bg)", color: "var(--ink)", boxSizing: "border-box" }}
               >
                 <option value="buyer">Buyer</option>
                 <option value="admin">Admin</option>
@@ -222,12 +223,12 @@ export function UsersClient({ members: initial }: { members: Member[] }) {
             </div>
 
             {inviteError && (
-              <p style={{ color: "var(--danger)", fontSize: 12, marginBottom: 12 }}>{inviteError}</p>
+              <div className="alert alert-err" style={{ marginBottom: 12, fontSize: 13 }}>{inviteError}</div>
             )}
 
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className="row" style={{ gap: 8 }}>
               <button
-                className="btn btn-primary"
+                className="btn btn-block"
                 onClick={handleInvite}
                 disabled={inviting || !inviteEmail.trim()}
                 style={{ flex: 1 }}
@@ -235,7 +236,7 @@ export function UsersClient({ members: initial }: { members: Member[] }) {
                 {inviting ? "Inviting…" : "Send invite"}
               </button>
               <button
-                className="btn btn-ghost"
+                className="btn btn-ghost btn-block"
                 onClick={() => { setShowInvite(false); setInviteError(""); }}
                 style={{ flex: 1 }}
               >

@@ -32,8 +32,8 @@ export default async function AccountLayout({ children }: { children: React.Reac
     <ToastProvider>
       <Header accountInfo={accountInfo} />
       {headerSnap && <MakeswiftComponent snapshot={headerSnap} label="Header Navigation" type="acme/header-nav" />}
-      <div className="container section">
-        <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 32, alignItems: "start" }}>
+      <div className="container">
+        <div className="account-shell">
           <AccountNav />
           <main id="main-content">{children}</main>
         </div>

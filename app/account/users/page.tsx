@@ -46,9 +46,13 @@ export default async function UsersPage() {
 
   if (!hasPermission(session.permissions, "company.users.manage")) {
     return (
-      <div className="card" style={{ padding: 40 }}>
-        <h1 className="text-h1" style={{ marginBottom: 8 }}>Team Members</h1>
-        <p style={{ color: "var(--muted)" }}>You don&apos;t have permission to manage users.</p>
+      <div>
+        <div className="page-h">
+          <h1>Team members</h1>
+        </div>
+        <div className="card" style={{ padding: "24px 20px" }}>
+          <p className="muted" style={{ fontSize: 13 }}>You don&apos;t have permission to manage users.</p>
+        </div>
       </div>
     );
   }

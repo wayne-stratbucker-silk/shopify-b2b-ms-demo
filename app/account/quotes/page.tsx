@@ -71,8 +71,8 @@ export default async function QuotesPage({ searchParams }: Props) {
   return (
     <div>
       {soonExpiring.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "var(--warn-fade, #fff7e8)", border: "1px solid var(--warn, #f59e0b)", borderRadius: "var(--radius-card)", marginBottom: 20, fontSize: 13 }}>
-          <Icon name="alert" size={16} style={{ color: "var(--warn, #f59e0b)", flexShrink: 0 }} />
+        <div className="alert alert-warn" style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+          <Icon name="alert" size={16} style={{ flexShrink: 0 }} />
           <span>
             <strong>{soonExpiring.length} quote{soonExpiring.length > 1 ? "s" : ""}</strong>{" "}
             {soonExpiring.length > 1 ? "are" : "is"} expiring within 7 days — review and accept before{" "}
@@ -81,70 +81,84 @@ export default async function QuotesPage({ searchParams }: Props) {
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <h1 className="text-h1">Quotes</h1>
-        <div style={{ display: "flex", gap: 8 }}>
+      <div className="page-h">
+        <div>
+          <h1>Quotes</h1>
+        </div>
+        <div className="row" style={{ gap: 8 }}>
           {hasQuoteCart && (
-            <Link href="/account/quotes/cart" className="btn" style={{ fontSize: 13 }}>
-              Quote Cart
+            <Link href="/account/quotes/cart" className="btn btn-ghost btn-sm">
+              Quote cart
             </Link>
           )}
-          <Link href="/account/quotes/new" className="btn btn-primary" style={{ fontSize: 13 }}>
-            + New Quote
+          <Link href="/account/quotes/new" className="btn btn-sm">
+            + New quote
           </Link>
         </div>
       </div>
 
       {canViewAll && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          <Link href="/account/quotes" className={`btn${!showAll ? " btn-primary" : ""}`} style={{ fontSize: 13 }}>My Quotes</Link>
-          <Link href="/account/quotes?view=all" className={`btn${showAll ? " btn-primary" : ""}`} style={{ fontSize: 13 }}>All Company Quotes</Link>
+        <div className="row" style={{ gap: 0, marginBottom: 20, borderBottom: "1px solid var(--line)" }}>
+          <Link
+            href="/account/quotes"
+            style={{ padding: "10px 16px", borderBottom: `2px solid ${!showAll ? "var(--primary)" : "transparent"}`, color: !showAll ? "var(--primary)" : "var(--muted)", fontSize: 13, fontWeight: !showAll ? 500 : 400, textDecoration: "none" }}
+          >
+            My quotes
+          </Link>
+          <Link
+            href="/account/quotes?view=all"
+            style={{ padding: "10px 16px", borderBottom: `2px solid ${showAll ? "var(--primary)" : "transparent"}`, color: showAll ? "var(--primary)" : "var(--muted)", fontSize: 13, fontWeight: showAll ? 500 : 400, textDecoration: "none" }}
+          >
+            Company quotes
+          </Link>
         </div>
       )}
 
       {quotes.length === 0 ? (
-        <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+        <div className="card" style={{ padding: "40px 16px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
           No quotes yet.{" "}
           <Link href="/account/quotes/new" style={{ color: "var(--primary)" }}>Request your first quote →</Link>
         </div>
       ) : (
-        <div className="card" style={{ overflow: "auto" }}>
-          <table className="tbl" style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th>Quote #</th>
-                <th>Date</th>
-                <th>Title</th>
-                <th>Status</th>
-                <th>Total</th>
-                <th>Expires</th>
-                <th></th>
+        <table className="tbl tbl-mobile-cards">
+          <thead>
+            <tr>
+              <th>Quote</th>
+              <th>Date</th>
+              <th className="col-hide">Title</th>
+              <th>Status</th>
+              <th className="num">Total</th>
+              <th className="col-meta">Expires</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {quotes.map(q => (
+              <tr key={q.id}>
+                <td className="col-primary">
+                  <Link href={`/account/quotes/${encodeURIComponent(q.id)}`} className="tbl row-link">
+                    {q.draftOrderName}
+                  </Link>
+                </td>
+                <td className="col-meta muted">{fmtDate(q.date)}</td>
+                <td className="col-hide muted" style={{ fontSize: 12 }}>{q.title || "—"}</td>
+                <td className="col-status">
+                  <span className={`status status-${STATUS_CLS[q.status]}`}>{STATUS_LABELS[q.status]}</span>
+                  {q.expires && isExpiringSoon(q.expires) && (
+                    <span className="status status-warn" style={{ marginLeft: 6, fontSize: 10 }}>Expires soon</span>
+                  )}
+                </td>
+                <td className="col-value num">{q.total > 0 ? fmt(q.total) : "—"}</td>
+                <td className="col-meta muted">{q.expires ? fmtDate(q.expires) : "—"}</td>
+                <td className="col-action">
+                  <Link href={`/account/quotes/${encodeURIComponent(q.id)}`} className="btn btn-ghost btn-xs">
+                    View
+                  </Link>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {quotes.map(q => (
-                <tr key={q.id}>
-                  <td style={{ fontWeight: 600 }}>{q.draftOrderName}</td>
-                  <td className="text-sm">{fmtDate(q.date)}</td>
-                  <td className="text-sm">{q.title || "—"}</td>
-                  <td>
-                    <span className={`status ${STATUS_CLS[q.status]}`}>{STATUS_LABELS[q.status]}</span>
-                    {q.expires && isExpiringSoon(q.expires) && (
-                      <span className="status warn" style={{ marginLeft: 6, fontSize: 10 }}>Expires soon</span>
-                    )}
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{q.total > 0 ? fmt(q.total) : "—"}</td>
-                  <td className="text-sm">{q.expires ? fmtDate(q.expires) : "—"}</td>
-                  <td>
-                    <Link href={`/account/quotes/${encodeURIComponent(q.id)}`} className="text-sm" style={{ color: "var(--primary)" }}>
-                      View →
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );
