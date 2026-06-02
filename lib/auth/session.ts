@@ -25,6 +25,7 @@ export interface Session {
   name: string;
   companyId?: string;           // Shopify Company GID
   companyName?: string;
+  companyExternalId?: string;   // Company externalId (ERP / account number reference)
   companyLocationId?: string;   // Active CompanyLocation GID (set at login, switchable)
   role: "admin" | "buyer";     // From CompanyContactRole at active location
   permissions: Permission[];

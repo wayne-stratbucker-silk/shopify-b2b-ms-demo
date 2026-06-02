@@ -26,11 +26,15 @@ export function UsersClient({ members: initial }: { members: Member[] }) {
   const [inviteSuccess, setInviteSuccess] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
 
-  function roleCls(name: string): string {
+  function rolePillCls(name: string): string {
     const n = name.toLowerCase();
-    if (n === "admin") return "err";
-    if (n === "buyer") return "info";
-    return "muted";
+    if (n === "admin") return "rolepill rolepill-admin";
+    if (n === "buyer") return "rolepill rolepill-buyer";
+    return "rolepill";
+  }
+
+  function initials(name: string): string {
+    return name.split(" ").map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase() || "?";
   }
 
   async function handleInvite() {
@@ -120,14 +124,19 @@ export function UsersClient({ members: initial }: { members: Member[] }) {
             <tbody>
               {members.map((m) => (
                 <tr key={m.id}>
-                  <td style={{ fontWeight: 600 }}>
-                    {m.name}
-                    {m.isMainContact && (
-                      <span className="badge" style={{ marginLeft: 6, fontSize: 10 }}>Main</span>
-                    )}
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div className="av">{initials(m.name)}</div>
+                      <span style={{ fontWeight: 600 }}>
+                        {m.name}
+                        {m.isMainContact && (
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".04em" }}>· Main</span>
+                        )}
+                      </span>
+                    </div>
                   </td>
                   <td className="text-sm">{m.email}</td>
-                  <td><span className={`status ${roleCls(m.role)}`}>{m.role}</span></td>
+                  <td><span className={rolePillCls(m.role)}>{m.role}</span></td>
                   <td className="text-sm">{m.location}</td>
                   <td>
                     {!m.isMainContact && (
