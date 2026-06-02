@@ -4,6 +4,7 @@ import type { Quote, QuoteItem, QuoteMessage, QuoteStatus, QuoteStatusKind } fro
 
 const QUOTE_NAMESPACE = "quote";
 const QUOTE_TAG = "b2b-quote";
+const CART_TAG = "b2b-quote-cart";
 
 const DRAFT_ORDER_FIELDS = `
   id
@@ -54,6 +55,7 @@ function getMeta(metafields: Array<{ namespace: string; key: string; value: stri
 
 function statusLabel(status: QuoteStatus): string {
   const labels: Record<QuoteStatus, string> = {
+    draft: "Draft",
     new: "Awaiting Review",
     in_process: "Quote Ready",
     updated_by_buyer: "Updated — Pending Review",
@@ -66,7 +68,7 @@ function statusLabel(status: QuoteStatus): string {
 
 function statusKind(status: QuoteStatus): QuoteStatusKind {
   if (status === "in_process" || status === "updated_by_buyer") return "ok";
-  if (status === "new") return "info";
+  if (status === "new" || status === "draft") return "info";
   if (status === "ordered") return "muted";
   if (status === "expired") return "err";
   return "muted";
@@ -159,6 +161,148 @@ export async function getQuotesForCustomer(customerId: string, first = 50): Prom
     { query, first },
   );
   return data.draftOrders.edges.map((e) => mapDraftOrder(e.node));
+}
+
+// ─── Persistent Quote Cart (Draft Orders tagged b2b-quote-cart) ───
+
+export interface CartLineItemInput {
+  variantId: string;
+  quantity: number;
+  originalUnitPrice: string;
+  title?: string;
+}
+
+export async function createCartDraftOrder(
+  customerId: string,
+  lineItems: CartLineItemInput[],
+  opts?: {
+    companyId?: string;
+    companyLocationId?: string;
+    companyContactId?: string;
+  },
+): Promise<{ id: string }> {
+  const data = await adminQuery<{
+    draftOrderCreate: {
+      draftOrder: { id: string } | null;
+      userErrors: Array<{ field: string[]; message: string }>;
+    };
+  }>(
+    `mutation CreateCartDraftOrder($input: DraftOrderInput!) {
+      draftOrderCreate(input: $input) {
+        draftOrder { id }
+        userErrors { field message }
+      }
+    }`,
+    {
+      input: {
+        lineItems,
+        customerId,
+        purchasingEntity: opts?.companyLocationId
+          ? {
+              purchasingCompany: {
+                companyId: opts.companyId,
+                companyLocationId: opts.companyLocationId,
+                companyContactId: opts.companyContactId,
+              },
+            }
+          : undefined,
+        tags: [CART_TAG],
+        metafields: [
+          { namespace: QUOTE_NAMESPACE, key: "status", value: "draft", type: "single_line_text_field" },
+        ],
+      },
+    },
+  );
+  const errors = data.draftOrderCreate.userErrors;
+  if (errors.length) throw new Error(errors.map((e) => e.message).join("; "));
+  if (!data.draftOrderCreate.draftOrder) throw new Error("Failed to create cart draft order");
+  return { id: data.draftOrderCreate.draftOrder.id };
+}
+
+export async function updateCartDraftOrder(
+  draftOrderId: string,
+  lineItems: CartLineItemInput[],
+): Promise<void> {
+  await adminQuery(
+    `mutation UpdateCartDraftOrder($id: ID!, $input: DraftOrderInput!) {
+      draftOrderUpdate(id: $id, input: $input) {
+        userErrors { message }
+      }
+    }`,
+    { id: draftOrderId, input: { lineItems } },
+  );
+}
+
+export async function deleteCartDraftOrder(draftOrderId: string): Promise<void> {
+  try {
+    await adminQuery(
+      `mutation DeleteCartDraftOrder($input: DraftOrderDeleteInput!) {
+        draftOrderDelete(input: $input) {
+          deletedId
+          userErrors { message }
+        }
+      }`,
+      { input: { id: draftOrderId } },
+    );
+  } catch {
+    // Swallow "not found" — the draft may have already been submitted or expired
+  }
+}
+
+export async function findCartDraftOrderForCustomer(customerId: string): Promise<string | null> {
+  const numericId = customerId.replace("gid://shopify/Customer/", "");
+  const query = `tag:${CART_TAG} customer_id:${numericId} status:open`;
+  const data = await adminQuery<{
+    draftOrders: { edges: Array<{ node: { id: string } }> };
+  }>(
+    `query FindCartDraftOrder($query: String!) {
+      draftOrders(first: 1, query: $query, sortKey: UPDATED_AT, reverse: true) {
+        edges { node { id } }
+      }
+    }`,
+    { query },
+  );
+  return data.draftOrders.edges[0]?.node.id ?? null;
+}
+
+export interface SubmitCartAsQuoteInput {
+  title?: string;
+  referenceNumber?: string;
+  poNumber?: string;
+  notes?: string;
+  expiresAt?: string;
+  shippingAddress?: MailingAddressInput;
+  billingAddress?: MailingAddressInput;
+}
+
+export async function submitCartAsQuote(
+  draftOrderId: string,
+  input: SubmitCartAsQuoteInput,
+): Promise<void> {
+  await adminQuery(
+    `mutation SubmitCartAsQuote($id: ID!, $input: DraftOrderInput!) {
+      draftOrderUpdate(id: $id, input: $input) {
+        userErrors { message }
+      }
+    }`,
+    {
+      id: draftOrderId,
+      input: {
+        tags: [QUOTE_TAG],
+        poNumber: input.poNumber,
+        note: input.notes,
+        shippingAddress: input.shippingAddress,
+        billingAddress: input.billingAddress,
+        metafields: [
+          { namespace: QUOTE_NAMESPACE, key: "status", value: "new", type: "single_line_text_field" },
+          { namespace: QUOTE_NAMESPACE, key: "title", value: input.title ?? "", type: "single_line_text_field" },
+          { namespace: QUOTE_NAMESPACE, key: "reference_number", value: input.referenceNumber ?? "", type: "single_line_text_field" },
+          { namespace: QUOTE_NAMESPACE, key: "expires_at", value: input.expiresAt ?? "", type: "single_line_text_field" },
+          { namespace: QUOTE_NAMESPACE, key: "notes_thread", value: JSON.stringify([]), type: "json" },
+        ],
+      },
+    },
+  );
 }
 
 export interface MailingAddressInput {
@@ -368,4 +512,36 @@ export async function sendQuoteInvoice(draftOrderId: string): Promise<{ invoiceU
   const errors = data.draftOrderInvoiceSend.userErrors;
   if (errors.length) throw new Error(errors.map((e) => e.message).join("; "));
   return { invoiceUrl: data.draftOrderInvoiceSend.draftOrder?.invoiceUrl ?? "" };
+}
+
+export async function completeDraftOrder(
+  draftOrderId: string,
+  paymentPending = true,
+): Promise<{ orderId: string; orderStatusUrl: string; orderName: string }> {
+  const data = await adminQuery<{
+    draftOrderComplete: {
+      draftOrder: {
+        id: string;
+        order: { id: string; statusUrl: string; name: string } | null;
+      } | null;
+      userErrors: Array<{ field: string[]; message: string }>;
+    };
+  }>(
+    `mutation CompleteDraftOrder($id: ID!, $paymentPending: Boolean) {
+      draftOrderComplete(id: $id, paymentPending: $paymentPending) {
+        draftOrder {
+          id
+          order { id statusUrl name }
+        }
+        userErrors { field message }
+      }
+    }`,
+    { id: draftOrderId, paymentPending },
+  );
+  const errors = data.draftOrderComplete.userErrors;
+  if (errors.length) throw new Error(errors.map((e) => e.message).join("; "));
+  if (!data.draftOrderComplete.draftOrder) throw new Error("Draft order not found");
+  const order = data.draftOrderComplete.draftOrder.order;
+  if (!order) throw new Error("Shopify did not return an order — the draft order may already be completed");
+  return { orderId: order.id, orderStatusUrl: order.statusUrl, orderName: order.name };
 }

@@ -6,6 +6,9 @@ import { getQuote } from "@/lib/quotes/client";
 import { QuoteMessageForm } from "@/components/quote-message-form";
 import { QuoteActions } from "@/components/quote-actions";
 import { QuoteLineItems } from "@/components/quote-line-items";
+import { AcceptButton } from "@/components/accept-button";
+import { AdminCompleteButton } from "@/components/admin-complete-button";
+import { RejectButton } from "@/components/reject-button";
 import type { QuoteStatus } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +21,7 @@ function fmtDate(s: string) {
 }
 
 const STATUS_LABELS: Record<QuoteStatus, string> = {
+  draft: "Draft",
   new: "Awaiting Review",
   in_process: "Quote Ready — Action Required",
   updated_by_buyer: "Updated by Buyer",
@@ -37,21 +41,29 @@ export default async function QuoteDetailPage({ params }: Props) {
   const quote = await getQuote(draftOrderId).catch(() => null);
   if (!quote) return notFound();
 
+  const isAdmin = hasPermission(session.permissions, "company.quotes.approve");
+  const isBuyer = hasPermission(session.permissions, "company.orders.create") && !isAdmin;
+
   // Any buyer with order creation rights can accept a vendor's quoted price
   const canAccept = quote.allowCheckout &&
     quote.status === "in_process" &&
-    hasPermission(session.permissions, "company.orders.create");
+    hasPermission(session.permissions, "company.orders.create") &&
+    !isAdmin;
 
   // Admins can internally approve a new quote (sending it to the sales rep)
-  const canApprove = quote.status === "new" &&
-    hasPermission(session.permissions, "company.quotes.approve");
+  const canApprove = quote.status === "new" && isAdmin;
 
   // Admins can send the Shopify draft-order invoice email to the buyer
-  const canSendEmail = hasPermission(session.permissions, "company.quotes.approve");
+  const canSendEmail = isAdmin;
+
+  // Admins can force-complete a quote on behalf of the buyer
+  const canComplete = quote.status === "in_process" && isAdmin;
+
+  // Admins can reject a pending or in-process quote
+  const canReject = (quote.status === "new" || quote.status === "in_process") && isAdmin;
 
   // Buyers can request changes when a quote is still active
-  const canRequestChanges = hasPermission(session.permissions, "company.orders.create") &&
-    !hasPermission(session.permissions, "company.quotes.approve");
+  const canRequestChanges = isBuyer;
 
   return (
     <div>
@@ -117,20 +129,25 @@ export default async function QuoteDetailPage({ params }: Props) {
               </a>
             )}
             {canAccept && (
-              <form action={`/api/quotes/${encodeURIComponent(quote.id)}`} method="POST">
-                <input type="hidden" name="action" value="accept" />
-                <button type="submit" className="btn btn-primary btn-block">
-                  Accept &amp; Checkout →
-                </button>
-              </form>
+              <AcceptButton quoteId={encodeURIComponent(quote.id)} />
             )}
             {canApprove && (
-              <form action={`/api/quotes/${encodeURIComponent(quote.id)}`} method="POST" style={{ marginTop: canAccept ? 8 : 0 }}>
+              <form action={`/api/quotes/${encodeURIComponent(quote.id)}`} method="POST" style={{ marginTop: 8 }}>
                 <input type="hidden" name="action" value="approve" />
                 <button type="submit" className="btn btn-block" style={{ borderColor: "var(--success)", color: "var(--success)" }}>
                   Approve Quote
                 </button>
               </form>
+            )}
+            {canComplete && (
+              <div style={{ marginTop: 8 }}>
+                <AdminCompleteButton quoteId={encodeURIComponent(quote.id)} />
+              </div>
+            )}
+            {canReject && (
+              <div style={{ marginTop: 8 }}>
+                <RejectButton quoteId={encodeURIComponent(quote.id)} />
+              </div>
             )}
             {canSendEmail && (
               <form action={`/api/quotes/${encodeURIComponent(quote.id)}`} method="POST" style={{ marginTop: 8 }}>

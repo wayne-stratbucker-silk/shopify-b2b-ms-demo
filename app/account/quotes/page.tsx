@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getQuotesForCompany, getQuotesForCustomer } from "@/lib/quotes/client";
-import { QUOTE_CART_COOKIE } from "@/lib/quotes/quote-cart";
+import { getQuoteCartDraftOrderId } from "@/lib/quotes/quote-cart";
 import { Icon } from "@/components/ui/icons";
 import type { Quote, QuoteStatus } from "@/types";
+
 
 function isExpiringSoon(dateStr: string, withinDays = 7): boolean {
   try {
@@ -25,6 +25,7 @@ function fmtDate(s: string) {
 }
 
 const STATUS_LABELS: Record<QuoteStatus, string> = {
+  draft: "Draft",
   new: "Awaiting Review",
   in_process: "Quote Ready",
   updated_by_buyer: "Updated",
@@ -34,6 +35,7 @@ const STATUS_LABELS: Record<QuoteStatus, string> = {
 };
 
 const STATUS_CLS: Record<QuoteStatus, string> = {
+  draft: "muted",
   new: "info",
   in_process: "ok",
   updated_by_buyer: "warn",
@@ -61,8 +63,9 @@ export default async function QuotesPage({ searchParams }: Props) {
     ? await getQuotesForCompany(session.companyId).catch(() => [])
     : await getQuotesForCustomer(session.customerId).catch(() => []);
 
-  const jar = await cookies();
-  const hasQuoteCart = !!jar.get(QUOTE_CART_COOKIE)?.value;
+  const hasQuoteCart = !!(await getQuoteCartDraftOrderId().catch(() => null));
+
+  const pendingCount = quotes.filter((q) => q.status === "new" || q.status === "updated_by_buyer").length;
 
   const soonExpiring = quotes.filter(
     (q) => q.expires && q.status === "in_process" && isExpiringSoon(q.expires),
@@ -107,10 +110,19 @@ export default async function QuotesPage({ searchParams }: Props) {
           </Link>
           <Link
             href="/account/quotes?view=all"
-            style={{ padding: "10px 16px", borderBottom: `2px solid ${showAll ? "var(--primary)" : "transparent"}`, color: showAll ? "var(--primary)" : "var(--muted)", fontSize: 13, fontWeight: showAll ? 500 : 400, textDecoration: "none" }}
+            style={{ padding: "10px 16px", borderBottom: `2px solid ${showAll ? "var(--primary)" : "transparent"}`, color: showAll ? "var(--primary)" : "var(--muted)", fontSize: 13, fontWeight: showAll ? 500 : 400, textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}
           >
             Company quotes
+            {!showAll && pendingCount > 0 && (
+              <span className="status status-warn" style={{ fontSize: 10, padding: "1px 6px" }}>{pendingCount} pending</span>
+            )}
           </Link>
+        </div>
+      )}
+      {showAll && canViewAll && pendingCount > 0 && (
+        <div style={{ marginBottom: 12, fontSize: 13, color: "var(--muted)" }}>
+          <span className="status status-warn" style={{ marginRight: 8 }}>{pendingCount} pending</span>
+          {pendingCount === 1 ? "quote requires" : "quotes require"} review
         </div>
       )}
 
