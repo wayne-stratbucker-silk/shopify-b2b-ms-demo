@@ -81,7 +81,15 @@ interface CustomerInfo {
 }
 
 export async function getCustomerWithCompany(customerId: string): Promise<CustomerInfo | null> {
-  const gid = customerId.startsWith("gid://") ? customerId : `gid://shopify/Customer/${customerId}`;
+  // Normalize to Admin API format: gid://shopify/Customer/{id}
+  // The JWT sub uses gid://shopify/CustomerAccount/... — strip to numeric ID and rebuild.
+  let gid: string;
+  if (customerId.startsWith("gid://shopify/Customer/") && !customerId.includes("Account")) {
+    gid = customerId;
+  } else {
+    const numericId = customerId.split("/").pop() ?? customerId;
+    gid = `gid://shopify/Customer/${numericId}`;
+  }
 
   // Step 1: basic customer lookup (always works with read_customers scope)
   const basicData = await adminQuery<{ customer: { id: string; email: string; firstName: string; lastName: string } | null }>(`
