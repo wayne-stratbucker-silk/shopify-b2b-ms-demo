@@ -80,12 +80,24 @@ export default async function OrdersPage({ searchParams }: Props) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <h1 className="text-h1">Orders</h1>
+      <div className="page-h">
+        <div>
+          <h1>Orders</h1>
+        </div>
         {canViewAll && (
-          <div style={{ display: "flex", gap: 8 }}>
-            <Link href="/account/orders" className={`btn${!showAll ? " btn-primary" : ""}`} style={{ fontSize: 13 }}>My Orders</Link>
-            <Link href="/account/orders?view=all" className={`btn${showAll ? " btn-primary" : ""}`} style={{ fontSize: 13 }}>Company Orders</Link>
+          <div className="row" style={{ gap: 0, borderBottom: "none" }}>
+            <Link
+              href="/account/orders"
+              style={{ padding: "0 16px 2px", borderBottom: `2px solid ${!showAll ? "var(--primary)" : "transparent"}`, color: !showAll ? "var(--primary)" : "var(--muted)", fontSize: 13, fontWeight: !showAll ? 500 : 400, textDecoration: "none" }}
+            >
+              My orders
+            </Link>
+            <Link
+              href="/account/orders?view=all"
+              style={{ padding: "0 16px 2px", borderBottom: `2px solid ${showAll ? "var(--primary)" : "transparent"}`, color: showAll ? "var(--primary)" : "var(--muted)", fontSize: 13, fontWeight: showAll ? 500 : 400, textDecoration: "none" }}
+            >
+              Company orders
+            </Link>
           </div>
         )}
       </div>
@@ -94,9 +106,9 @@ export default async function OrdersPage({ searchParams }: Props) {
       {totalOrders > 0 && (
         <div className="g4" style={{ marginBottom: 24 }}>
           {[
-            { label: "Total Orders", value: String(totalOrders) },
-            { label: "MTD Value", value: fmt(mtdValue, currency) },
-            { label: "YTD Value", value: fmt(ytdValue, currency) },
+            { label: "Total orders", value: String(totalOrders) },
+            { label: "MTD value", value: fmt(mtdValue, currency) },
+            { label: "YTD value", value: fmt(ytdValue, currency) },
             { label: "Fulfilled", value: String(fulfilledCount) },
           ].map(({ label, value }) => (
             <div key={label} className="kpi">
@@ -108,50 +120,50 @@ export default async function OrdersPage({ searchParams }: Props) {
       )}
 
       {orders.length === 0 ? (
-        <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+        <div className="card" style={{ padding: "40px 16px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
           No orders yet. <Link href="/" style={{ color: "var(--primary)" }}>Start shopping →</Link>
         </div>
       ) : (
-        <div className="card" style={{ overflow: "auto" }}>
-          <table className="tbl" style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th>Order #</th>
-                <th>Date</th>
-                <th>Buyer</th>
-                <th>PO #</th>
-                <th>Status</th>
-                <th>Total</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map(order => {
-                const amt = parseFloat(order.totalPriceSet.shopMoney.amount);
-                const buyer = order.customer ? `${order.customer.firstName ?? ""} ${order.customer.lastName ?? ""}`.trim() : "—";
-                return (
-                  <tr key={order.id}>
-                    <td style={{ fontWeight: 600 }}>{order.name}</td>
-                    <td className="text-sm">{fmtDate(order.createdAt)}</td>
-                    <td className="text-sm">{buyer}</td>
-                    <td className="text-sm text-mono">{order.poNumber || "—"}</td>
-                    <td>
-                      <span className={`status ${statusCls(order.displayFinancialStatus)}`}>
-                        {order.displayFinancialStatus}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{fmt(amt, order.totalPriceSet.shopMoney.currencyCode)}</td>
-                    <td>
-                      <Link href={`/account/orders/${encodeURIComponent(order.id)}`} className="text-sm" style={{ color: "var(--primary)" }}>
-                        View →
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <table className="tbl tbl-mobile-cards">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Date</th>
+              <th>Buyer</th>
+              <th className="col-hide">PO #</th>
+              <th>Status</th>
+              <th className="num">Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map(order => {
+              const amt = parseFloat(order.totalPriceSet.shopMoney.amount);
+              const buyer = order.customer ? `${order.customer.firstName ?? ""} ${order.customer.lastName ?? ""}`.trim() : "—";
+              return (
+                <tr key={order.id}>
+                  <td className="col-primary">
+                    <Link href={`/account/orders/${encodeURIComponent(order.id)}`} className="tbl row-link">{order.name}</Link>
+                  </td>
+                  <td className="col-meta muted">{fmtDate(order.createdAt)}</td>
+                  <td className="col-meta">{buyer || "—"}</td>
+                  <td className="col-hide mono" style={{ fontSize: 12 }}>{order.poNumber || "—"}</td>
+                  <td className="col-status">
+                    <span className={`status status-${statusCls(order.displayFinancialStatus)}`}>
+                      {order.displayFinancialStatus}
+                    </span>
+                  </td>
+                  <td className="col-value num">{fmt(amt, order.totalPriceSet.shopMoney.currencyCode)}</td>
+                  <td className="col-action">
+                    <Link href={`/account/orders/${encodeURIComponent(order.id)}`} className="btn btn-ghost btn-xs">
+                      View
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
     </div>
   );

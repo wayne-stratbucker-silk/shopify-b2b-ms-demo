@@ -46,108 +46,134 @@ async function getSalesRep(companyId: string): Promise<SalesRep | null> {
   return { name, initials, title: get("title"), email: get("email") || undefined, phone: get("phone") || undefined };
 }
 
+const fmt = (n: number, currency = "USD") =>
+  n.toLocaleString("en-US", { style: "currency", currency });
+
+function fmtDate(s: string): string {
+  try {
+    return new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  } catch { return ""; }
+}
+
+function orderStatusCls(s: string): string {
+  if (s === "PAID") return "ok";
+  if (s === "PENDING" || s === "PARTIALLY_PAID") return "warn";
+  if (s === "REFUNDED" || s === "VOIDED") return "muted";
+  return "info";
+}
+
 export default async function AccountDashboard() {
   const session = await getSession();
   if (!session) return null;
 
-  const [orders, rep] = await Promise.all([
+  const firstName = session.name.split(" ")[0];
+
+  const [orders, salesRep] = await Promise.all([
     session.companyId ? getRecentOrders(session.companyId) : Promise.resolve([]),
     session.companyId ? getSalesRep(session.companyId) : Promise.resolve(null),
   ]);
 
   return (
     <div>
-      <div style={{ marginBottom: 32 }}>
-        <h1 className="text-h1">Welcome back, {session.name.split(" ")[0]}</h1>
-        {session.companyName && (
-          <p className="text-body" style={{ color: "var(--muted)", marginTop: 4 }}>{session.companyName}</p>
-        )}
-      </div>
-
-      {/* Quick links */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 40 }}>
-        {[
-          { href: "/account/orders", label: "Orders", icon: "📋" },
-          { href: "/account/quotes", label: "Quotes", icon: "💬" },
-          { href: "/account/lists", label: "Shopping Lists", icon: "📝" },
-          { href: "/account/invoices", label: "Invoices", icon: "🧾" },
-          { href: "/account/quick-order", label: "Quick Order", icon: "⚡" },
-          { href: "/account/addresses", label: "Addresses", icon: "📍" },
-        ].map(({ href, label, icon }) => (
-          <Link key={href} href={href} className="card card-h" style={{ padding: 20, textAlign: "center" }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
-            <div className="text-h4" style={{ fontWeight: 600 }}>{label}</div>
-          </Link>
-        ))}
-      </div>
-
-      {/* Recent orders + Sales rep (2-col on desktop) */}
-      <div className={rep ? "g2" : ""} style={{ alignItems: "start" }}>
-        {/* Recent orders */}
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <h2 className="text-h2">Recent Orders</h2>
-            <Link href="/account/orders" className="text-sm" style={{ color: "var(--primary)" }}>View all →</Link>
+      <div className="acct-dash-desktop">
+        {/* Greeting */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
+            <h1 style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-.02em", margin: 0 }}>
+              Welcome back, {firstName}
+            </h1>
+            <div className="row" style={{ gap: 8 }}>
+              <Link href="/account/quick-order" className="btn btn-ghost btn-sm">Quick order</Link>
+            </div>
           </div>
-          {orders.length > 0 ? (
-            <div className="card" style={{ overflow: "auto" }}>
-              <table className="tbl" style={{ width: "100%" }}>
-                <thead>
-                  <tr>
-                    <th>Order</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map(order => (
-                    <tr key={order.id}>
-                      <td><Link href={`/account/orders/${order.id.split("/").pop()}`} style={{ color: "var(--primary)", fontWeight: 600 }}>{order.name}</Link></td>
-                      <td className="text-sm">{new Date(order.createdAt).toLocaleDateString()}</td>
-                      <td><span className="status">{order.displayFinancialStatus}</span></td>
-                      <td className="text-sm" style={{ fontWeight: 600 }}>
-                        {new Intl.NumberFormat("en-US", { style: "currency", currency: order.totalPriceSet.shopMoney.currencyCode }).format(parseFloat(order.totalPriceSet.shopMoney.amount))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="card" style={{ padding: 32, textAlign: "center", color: "var(--muted)" }}>
-              No orders yet. <Link href="/" style={{ color: "var(--primary)" }}>Start shopping →</Link>
-            </div>
-          )}
         </div>
 
-        {/* Sales rep card */}
-        {rep && (
-          <div className="card" style={{ padding: 20 }}>
-            <div style={{ fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>
-              Your account rep
+        {/* Row: Recent Orders (wider) + Sales rep (narrower) — stacks on mobile */}
+        <div className="dash-orders-row" style={{ marginBottom: 24 }}>
+          {/* Recent orders */}
+          <div className="card">
+            <div className="card-h">
+              <h3>Recent orders</h3>
+              <Link href="/account/orders" style={{ fontSize: 12, color: "var(--muted)" }}>View all →</Link>
             </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
-              <div className="av" style={{ width: 40, height: 40, fontSize: 14, flexShrink: 0 }}>{rep.initials}</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{rep.name}</div>
-                {rep.title && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{rep.title}</div>}
-              </div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {rep.phone && (
-                <a href={`tel:${rep.phone.replace(/\s/g, "")}`} style={{ fontSize: 13, color: "var(--ink-2)", textDecoration: "none" }}>
-                  📞 {rep.phone}
-                </a>
-              )}
-              {rep.email && (
-                <a href={`mailto:${rep.email}`} style={{ fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>
-                  ✉ {rep.email}
-                </a>
-              )}
-            </div>
+            <table className="tbl tbl-mobile-cards">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th className="num">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="muted" style={{ textAlign: "center", padding: "24px 16px", fontSize: 13 }}>
+                      No orders yet.{" "}
+                      <Link href="/" style={{ color: "var(--primary)" }}>Start shopping →</Link>
+                    </td>
+                  </tr>
+                ) : (
+                  orders.map((o) => (
+                    <tr key={o.id}>
+                      <td className="col-primary">
+                        <Link href={`/account/orders/${encodeURIComponent(o.id)}`} className="tbl row-link">{o.name}</Link>
+                      </td>
+                      <td className="col-meta muted">{fmtDate(o.createdAt)}</td>
+                      <td className="col-status">
+                        <span className={`status status-${orderStatusCls(o.displayFinancialStatus)}`}>{o.displayFinancialStatus}</span>
+                      </td>
+                      <td className="col-value num">
+                        {fmt(parseFloat(o.totalPriceSet.shopMoney.amount), o.totalPriceSet.shopMoney.currencyCode)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
+
+          {/* Sales rep card */}
+          <div className="card">
+            <div className="card-h">
+              <h3>Your account rep</h3>
+            </div>
+            {salesRep ? (
+              <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                  <div className="av" style={{ width: 44, height: 44, fontSize: 16, flexShrink: 0 }}>{salesRep.initials}</div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{salesRep.name}</div>
+                    <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{salesRep.title}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {salesRep.phone && (
+                    <a href={`tel:${salesRep.phone}`} style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center", color: "var(--ink-2)", textDecoration: "none" }}>
+                      <span style={{ fontSize: 11, color: "var(--muted)", minWidth: 40 }}>Phone</span>
+                      {salesRep.phone}
+                    </a>
+                  )}
+                  {salesRep.email && (
+                    <a href={`mailto:${salesRep.email}`} style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center", color: "var(--primary)", textDecoration: "none" }}>
+                      <span style={{ fontSize: 11, color: "var(--muted)", minWidth: 40 }}>Email</span>
+                      {salesRep.email}
+                    </a>
+                  )}
+                </div>
+                {salesRep.email && (
+                  <a href={`mailto:${salesRep.email}`} className="btn btn-ghost btn-sm btn-block" style={{ marginTop: "auto", justifyContent: "center" }}>
+                    Contact your rep
+                  </a>
+                )}
+              </div>
+            ) : (
+              <div className="card-b muted" style={{ fontSize: 13, padding: "24px 16px", textAlign: "center" }}>
+                No account rep assigned yet.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
