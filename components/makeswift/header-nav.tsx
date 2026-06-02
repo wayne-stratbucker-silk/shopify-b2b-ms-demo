@@ -6,7 +6,6 @@ import {
   TextInput,
   List,
   Shape,
-  Combobox,
   Link,
 } from "@makeswift/runtime/controls";
 import MegaNav, { type NavNode } from "@/components/mega-nav";
@@ -14,27 +13,15 @@ import type { MSLink } from "@/lib/makeswift/link";
 
 // ─── Header navigation (Makeswift wrapper) ──────────────────────────────────
 //
-// The collection list comes LIVE from Shopify. There are two layers:
+// Navigation hierarchy is driven by a Shopify Menu (Admin → Online Store →
+// Navigation). Set `menuHandle` to the handle of the menu you want to use
+// (default: "main-menu"). The menu defines all L1–L3 category structure; the
+// Storefront API returns the nested tree which feeds the mega-nav panels.
 //
-//   • "All Categories" launcher — always reflects the FULL live Shopify
-//     collection list, with zero Makeswift input. Add/rename a collection in
-//     Shopify and it appears here.
-//   • Pinned collections — an optional curated subset the admin selects from
-//     the existing Shopify collections (searchable dropdown). These render as
-//     the bar items beside "All Categories". Leave empty to show every collection.
 //   • Content pages — right-aligned links to authored content/marketing pages.
 //     Each may carry an optional list of sub-links, rendered as a two-level
 //     dropdown. Content pages always stay visible — they never collapse into
-//     the collections' "More" overflow.
-
-// Combobox value — a plain object so it satisfies Makeswift's JSON `Data`
-// constraint. `id` is the BC category id; `name` is the path label kept so the
-// builder can show a friendly item label.
-type CategoryRef = { id: string; name: string };
-
-interface PinnedCategory {
-  category?: CategoryRef;
-}
+//     the categories' "More" overflow.
 
 interface ContentSubLink {
   label?: string;
@@ -48,23 +35,19 @@ interface ContentPageLink {
 }
 
 interface Props {
-  pinnedCategories?: PinnedCategory[];
+  menuHandle?: string;
   contentLinks?: ContentPageLink[];
   freeFreightText?: string;
   className?: string;
 }
 
 function HeaderNav({
-  pinnedCategories = [],
+  menuHandle = "main-menu",
   contentLinks = [],
   freeFreightText,
   className,
 }: Props) {
   const freightDisplay = freeFreightText || "Free freight over $500";
-
-  const pinnedIds = pinnedCategories
-    .map((p) => p.category?.id)
-    .filter((id): id is string => !!id);
 
   // Map the admin-authored content pages into NavNodes. Tagged "content" so the
   // nav renders them right of the divider — always visible, never folded into
@@ -92,7 +75,7 @@ function HeaderNav({
   return (
     <MegaNav
       className={className}
-      pinnedIds={pinnedIds}
+      menuHandle={menuHandle}
       contentPages={contentPages}
       tail={<span>{freightDisplay}</span>}
     />
@@ -101,52 +84,18 @@ function HeaderNav({
 
 // ─── Makeswift registration ────────────────────────────────────────────────
 
-// Flatten the live Shopify collections into searchable options for the builder.
-// Runs client-side inside the Makeswift host iframe, so the relative fetch
-// resolves against the storefront origin.
-async function categoryOptions(query: string) {
-  try {
-    const res = await fetch("/api/shopify/collections");
-    const tree = await res.json();
-    const opts: { id: string; label: string; value: CategoryRef }[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const walk = (nodes: any[], prefix: string) => {
-      for (const n of nodes ?? []) {
-        const id = String(n.id);
-        const label = prefix ? `${prefix} › ${n.name}` : n.name;
-        opts.push({ id, label, value: { id, name: label } });
-        if (n.children?.length) walk(n.children, label);
-      }
-    };
-    walk(Array.isArray(tree) ? tree : [], "");
-    const q = query.trim().toLowerCase();
-    return q ? opts.filter((o) => o.label.toLowerCase().includes(q)) : opts;
-  } catch {
-    return [];
-  }
-}
-
 runtime.registerComponent(HeaderNav, {
   type: "acme/header-nav",
   label: "Navigation / Header Navigation",
   props: {
     className: Style(),
+    menuHandle: TextInput({
+      label: "Shopify menu handle",
+      defaultValue: "main-menu",
+    }),
     freeFreightText: TextInput({
       label: "Free freight text",
       defaultValue: "Free freight over $500",
-    }),
-    pinnedCategories: List({
-      label: "Categories (nav bar)",
-      type: Shape({
-        type: {
-          category: Combobox({
-            label: "Category",
-            getOptions: categoryOptions,
-          }),
-        },
-      }),
-      getItemLabel: (item) =>
-        (item?.category as CategoryRef | undefined)?.name || "Select a category",
     }),
     contentLinks: List({
       label: "Content pages (right side)",
