@@ -72,7 +72,7 @@ interface CustomerInfo {
   lastName: string;
   companyContacts: Array<{
     id: string;
-    company: { id: string; name: string };
+    company: { id: string; name: string; externalId?: string | null };
     roleAssignments: Array<{
       companyLocation: { id: string; name: string };
       role: { name: string };
@@ -107,7 +107,7 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
           edges: Array<{
             node: {
               id: string;
-              company: { id: string; name: string };
+              company: { id: string; name: string; externalId?: string | null };
               roleAssignments: { edges: Array<{ node: { companyLocation: { id: string; name: string }; role: { name: string } } }> };
             };
           }>;
@@ -121,7 +121,7 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
             edges {
               node {
                 id
-                company { id name }
+                company { id name externalId }
                 roleAssignments(first: 10) {
                   edges {
                     node {
@@ -169,6 +169,7 @@ export function buildSession(customer: CustomerInfo): Session {
     name: `${customer.firstName} ${customer.lastName}`.trim(),
     companyId: contact?.company?.id,
     companyName: contact?.company?.name,
+    companyExternalId: contact?.company?.externalId ?? undefined,
     companyLocationId: firstAssignment?.companyLocation?.id,
     role,
     permissions: permissionsForRole(role),

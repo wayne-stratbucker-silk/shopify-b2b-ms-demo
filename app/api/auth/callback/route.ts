@@ -107,7 +107,6 @@ async function handleCallback(req: Request) {
     if (customer) {
       session = buildSession(customer);
     } else {
-      // Customer not in Admin API (different store or non-B2B) — use JWT claims
       console.warn("[auth/callback] customer not found in Admin API, using JWT claims. id:", adminCustomerId);
       session = {
         customerId: rawSub,
@@ -118,7 +117,6 @@ async function handleCallback(req: Request) {
       };
     }
   } catch (e) {
-    // Admin API failed (scope issue, invalid GID format, etc.) — still allow login
     console.warn("[auth/callback] Admin API lookup failed, using JWT claims:", String(e));
     session = {
       customerId: rawSub,

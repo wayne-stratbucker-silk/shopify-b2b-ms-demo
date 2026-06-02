@@ -53,20 +53,12 @@ export function AccountNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
-  const [accountInfo, setAccountInfo] = useState<unknown | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d?.user) setSession(d.user); })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d) setAccountInfo(d); })
       .catch(() => {});
   }, []);
 
@@ -113,7 +105,6 @@ export function AccountNav() {
   }
 
   const companyName = session?.companyName || "Your company";
-  const rep = (accountInfo as { salesRep?: { initials: string; name: string; title: string; phone?: string; email?: string } } | null)?.salesRep;
 
   // The active item powers the mobile trigger button label + icon. Default
   // to the first item (Dashboard) if nothing matches yet.
@@ -189,40 +180,12 @@ export function AccountNav() {
         <p className="org-name">{companyName}</p>
         {session && (
           <p className="org-meta" style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-            {session.name} · {session.role}
+            {session.name || session.email} · {session.role}
           </p>
         )}
         <div style={{ marginTop: 10 }}>
           <CompanySwitcher />
         </div>
-        {rep && (
-          <div className="account-rep" style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
-            <div style={{ fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 8 }}>
-              Your rep
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-              <div className="av" style={{ width: 28, height: 28, fontSize: 11, flexShrink: 0 }}>{rep.initials}</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 12 }}>{rep.name}</div>
-                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>{rep.title}</div>
-              </div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              {rep.phone && (
-                <a href={`tel:${rep.phone.replace(/\s/g, "")}`} style={{ fontSize: 11, color: "var(--ink-2)", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
-                  <Icon name="phone" size={12} style={{ color: "var(--muted)", flexShrink: 0 }} />
-                  {rep.phone}
-                </a>
-              )}
-              {rep.email && (
-                <a href={`mailto:${rep.email}`} style={{ fontSize: 11, color: "var(--primary)", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
-                  <Icon name="mail" size={12} style={{ color: "var(--muted)", flexShrink: 0 }} />
-                  {rep.email}
-                </a>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Mobile trigger — shows the active section and opens the drawer.

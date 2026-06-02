@@ -33,9 +33,9 @@ interface ShopifyOrder {
   lineItems: { edges: Array<{ node: { title: string } }> };
 }
 
-async function fetchOrders(companyId: string, viewAll: boolean): Promise<ShopifyOrder[]> {
+async function fetchOrders(companyId: string, viewAll: boolean, email: string): Promise<ShopifyOrder[]> {
   const id = companyId.replace("gid://shopify/Company/", "");
-  const query = viewAll ? `company_id:${id}` : `company_id:${id}`;
+  const query = viewAll ? `company_id:${id}` : `company_id:${id} email:${email}`;
   const data = await adminQuery<{ orders: { edges: Array<{ node: ShopifyOrder }> } }>(
     `query GetOrders($query: String!) {
       orders(first: 50, query: $query, sortKey: CREATED_AT, reverse: true) {
@@ -62,7 +62,21 @@ export default async function OrdersPage({ searchParams }: Props) {
   const canViewAll = hasPermission(session.permissions, "company.orders.view_all");
   const showAll = view === "all" && canViewAll;
 
-  const orders = session.companyId ? await fetchOrders(session.companyId, showAll) : [];
+  const orders = session.companyId ? await fetchOrders(session.companyId, showAll, session.email) : [];
+
+  const now = new Date();
+  const thisMonth = now.getMonth();
+  const thisYear = now.getFullYear();
+  const currency = orders[0]?.totalPriceSet.shopMoney.currencyCode ?? "USD";
+
+  const totalOrders = orders.length;
+  const mtdValue = orders
+    .filter(o => { const d = new Date(o.createdAt); return d.getMonth() === thisMonth && d.getFullYear() === thisYear; })
+    .reduce((s, o) => s + parseFloat(o.totalPriceSet.shopMoney.amount), 0);
+  const ytdValue = orders
+    .filter(o => new Date(o.createdAt).getFullYear() === thisYear)
+    .reduce((s, o) => s + parseFloat(o.totalPriceSet.shopMoney.amount), 0);
+  const fulfilledCount = orders.filter(o => o.displayFulfillmentStatus === "FULFILLED").length;
 
   return (
     <div>
@@ -75,6 +89,23 @@ export default async function OrdersPage({ searchParams }: Props) {
           </div>
         )}
       </div>
+
+      {/* KPI tiles */}
+      {totalOrders > 0 && (
+        <div className="g4" style={{ marginBottom: 24 }}>
+          {[
+            { label: "Total Orders", value: String(totalOrders) },
+            { label: "MTD Value", value: fmt(mtdValue, currency) },
+            { label: "YTD Value", value: fmt(ytdValue, currency) },
+            { label: "Fulfilled", value: String(fulfilledCount) },
+          ].map(({ label, value }) => (
+            <div key={label} className="kpi">
+              <div className="lbl">{label}</div>
+              <div className="val">{value}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {orders.length === 0 ? (
         <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>

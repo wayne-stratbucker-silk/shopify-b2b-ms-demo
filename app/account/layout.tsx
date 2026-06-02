@@ -24,7 +24,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
 
   const accountInfo: HeaderAccountInfo = {
     company: session.companyName ?? "",
-    accountNumber: "",
+    accountNumber: session.companyExternalId ?? "",
     repName: "",
   };
 
