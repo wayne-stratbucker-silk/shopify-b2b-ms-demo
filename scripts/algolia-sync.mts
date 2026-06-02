@@ -155,6 +155,23 @@ function toAlgoliaRecord(product: ShopifyProduct): AlgoliaRecord {
 async function main() {
   console.log(`🔄 Syncing Shopify products to Algolia index: ${INDEX_NAME}`);
 
+  // Configure index settings so facets are searchable and orderable
+  await client.setSettings({
+    indexName: INDEX_NAME,
+    indexSettings: {
+      searchableAttributes: ["name", "sku", "brand", "tags"],
+      attributesForFaceting: [
+        "searchable(brand)",
+        "filterOnly(category)",
+        "filterOnly(inStock)",
+        "tags",
+        "uom",
+      ],
+      customRanking: ["desc(totalInventory)"],
+    },
+  });
+  console.log("✓ Index settings configured");
+
   const products = await fetchAllProducts();
   console.log(`\n✓ Fetched ${products.length} products from Shopify`);
 

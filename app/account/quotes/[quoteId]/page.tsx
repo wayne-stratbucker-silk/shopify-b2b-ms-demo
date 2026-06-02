@@ -3,6 +3,9 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getQuote } from "@/lib/quotes/client";
+import { QuoteMessageForm } from "@/components/quote-message-form";
+import { QuoteActions } from "@/components/quote-actions";
+import { QuoteLineItems } from "@/components/quote-line-items";
 import type { QuoteStatus } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +49,10 @@ export default async function QuoteDetailPage({ params }: Props) {
   // Admins can send the Shopify draft-order invoice email to the buyer
   const canSendEmail = hasPermission(session.permissions, "company.quotes.approve");
 
+  // Buyers can request changes when a quote is still active
+  const canRequestChanges = hasPermission(session.permissions, "company.orders.create") &&
+    !hasPermission(session.permissions, "company.quotes.approve");
+
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
@@ -62,28 +69,12 @@ export default async function QuoteDetailPage({ params }: Props) {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 24 }}>
         <div>
-          {/* Line items */}
-          <div className="card" style={{ overflow: "auto", marginBottom: 16 }}>
-            <table className="tbl" style={{ width: "100%" }}>
-              <thead><tr><th>Product</th><th>SKU</th><th>Qty</th><th>List Price</th><th>Quoted Price</th><th>Total</th></tr></thead>
-              <tbody>
-                {(quote.quoteItems ?? []).map((item, i) => (
-                  <tr key={i}>
-                    <td style={{ fontWeight: 500 }}>{item.name}</td>
-                    <td className="text-sm text-mono">{item.sku}</td>
-                    <td>{item.qty}</td>
-                    <td className="text-sm" style={{ textDecoration: item.quotedPrice < item.listPrice ? "line-through" : "none", color: "var(--muted)" }}>
-                      {fmt(item.listPrice)}
-                    </td>
-                    <td style={{ fontWeight: 600, color: item.quotedPrice < item.listPrice ? "var(--success)" : "inherit" }}>
-                      {fmt(item.quotedPrice)}
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{fmt(item.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {/* Line items — admins get inline price editing */}
+          <QuoteLineItems
+            quoteId={encodeURIComponent(quote.id)}
+            items={quote.quoteItems ?? []}
+            isAdmin={canSendEmail}
+          />
 
           {/* Message thread */}
           {(quote.messages ?? []).length > 0 && (
@@ -100,6 +91,8 @@ export default async function QuoteDetailPage({ params }: Props) {
               ))}
             </div>
           )}
+
+          <QuoteMessageForm quoteId={encodeURIComponent(quote.id)} />
         </div>
 
         {/* Sidebar */}
@@ -111,6 +104,17 @@ export default async function QuoteDetailPage({ params }: Props) {
               <p className="text-xs" style={{ color: "var(--muted)", marginBottom: 12 }}>
                 Expires {fmtDate(quote.expires)}
               </p>
+            )}
+            {quote.invoiceUrl && (
+              <a
+                href={quote.invoiceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-ghost btn-block"
+                style={{ marginBottom: 8, textAlign: "center", display: "block" }}
+              >
+                View Invoice PDF
+              </a>
             )}
             {canAccept && (
               <form action={`/api/quotes/${encodeURIComponent(quote.id)}`} method="POST">
@@ -154,6 +158,12 @@ export default async function QuoteDetailPage({ params }: Props) {
               <div className="text-mono">{quote.referenceNumber}</div>
             </div>
           )}
+
+          <QuoteActions
+            quoteId={encodeURIComponent(quote.id)}
+            status={quote.status}
+            canRequestChanges={canRequestChanges}
+          />
         </div>
       </div>
     </div>

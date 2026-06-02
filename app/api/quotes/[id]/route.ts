@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { getQuote, sendQuoteInvoice, updateQuoteStatus, addQuoteMessage } from "@/lib/quotes/client";
+import {
+  getQuote, sendQuoteInvoice, updateQuoteStatus, addQuoteMessage,
+  updateQuoteLineItemPrice, updateQuoteExpiry,
+} from "@/lib/quotes/client";
+import { setQuoteCart } from "@/lib/quotes/quote-cart";
 import { hasPermission } from "@/lib/auth/permissions";
 import type { QuoteStatus } from "@/types";
 
@@ -22,10 +26,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const { id } = await params;
   const draftOrderId = decodeURIComponent(id);
-  const { action, status, message } = await req.json() as {
+  const { action, status, message, lineItemId, price, expiresAt } = await req.json() as {
     action?: string;
     status?: string;
     message?: string;
+    lineItemId?: string;
+    price?: number;
+    expiresAt?: string;
   };
 
   // Accept: buyer accepts the quoted price and proceeds to checkout.
@@ -72,6 +79,47 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (action === "status" && status) {
     await updateQuoteStatus(draftOrderId, status as QuoteStatus);
     return NextResponse.json({ ok: true });
+  }
+
+  // Set or extend quote expiry date (admins only)
+  if (action === "set_expiry" && expiresAt) {
+    if (!hasPermission(session.permissions, "company.quotes.approve")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    await updateQuoteExpiry(draftOrderId, expiresAt);
+    return NextResponse.json({ ok: true });
+  }
+
+  // Inline price edit on a line item (admins only)
+  if (action === "update_line_price" && lineItemId && price != null) {
+    if (!hasPermission(session.permissions, "company.quotes.approve")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const q = await getQuote(draftOrderId);
+    if (!q) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const item = q.quoteItems?.find((i) => i.lineItemId === lineItemId);
+    await updateQuoteLineItemPrice(draftOrderId, lineItemId, item?.listPrice ?? price, price);
+    return NextResponse.json({ ok: true });
+  }
+
+  // Reload quote items into the quote cart (for buyer "Request changes" flow)
+  if (action === "reload_to_cart") {
+    const q = await getQuote(draftOrderId);
+    if (!q) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const items = (q.quoteItems ?? [])
+      .filter((item) => item.variantId && item.productId)
+      .map((item) => ({
+        sku: item.sku,
+        name: item.name,
+        quantity: item.qty,
+        price: item.listPrice,
+        variantId: item.variantId!,
+        productId: item.productId!,
+        handle: item.productHandle ?? item.sku,
+        imageUrl: item.imageUrl,
+      }));
+    await setQuoteCart(items);
+    return NextResponse.json({ ok: true, count: items.length });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
