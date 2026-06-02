@@ -11,7 +11,8 @@ export interface RawShopifyHit {
   price: number;
   compareAtPrice?: number;
   imageUrl?: string;
-  category: string;       // first collection handle
+  category: string;       // first collection handle (backward compat)
+  collections?: string[]; // all collection handles
   inStock: boolean;
   totalInventory: number;
   uom: string;
@@ -48,7 +49,12 @@ export function normalizeHit(raw: RawShopifyHit): NormalizedHit {
 
 export function filterByCollection(hits: NormalizedHit[], collectionHandle: string): NormalizedHit[] {
   const h = collectionHandle.toLowerCase();
-  return hits.filter((hit) => hit.category?.toLowerCase() === h);
+  return hits.filter((hit) => {
+    if (Array.isArray(hit.collections) && hit.collections.length > 0) {
+      return hit.collections.some((c) => c.toLowerCase() === h);
+    }
+    return hit.category?.toLowerCase() === h;
+  });
 }
 
 export function filterByBrand(hits: NormalizedHit[], brandName: string): NormalizedHit[] {
@@ -84,7 +90,7 @@ function facetLabel(attr: string): string {
     attr.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-const HIDDEN_FACETS = new Set(["inStock", "objectID", "handle", "path", "image", "imageUrl", "totalInventory", "stockQty", "price", "compareAtPrice"]);
+const HIDDEN_FACETS = new Set(["inStock", "objectID", "handle", "path", "image", "imageUrl", "totalInventory", "stockQty", "price", "compareAtPrice", "category", "collections"]);
 
 // When the Algolia index has no facet config, fall back to these sensible defaults.
 const DEFAULT_FACETS: FacetDef[] = [

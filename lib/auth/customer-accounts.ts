@@ -80,11 +80,6 @@ interface CustomerInfo {
   }>;
 }
 
-function companyFromTags(tags: string[]): string | null {
-  const tag = tags.find(t => t.toLowerCase().startsWith("company:"));
-  return tag ? tag.slice("company:".length).trim() : null;
-}
-
 function buildCompanyContacts(company: string | null | undefined): CustomerInfo["companyContacts"] {
   if (!company) return [];
   return [{ id: "default", company: { id: "default", name: company, externalId: null }, roleAssignments: [] }];
@@ -92,19 +87,23 @@ function buildCompanyContacts(company: string | null | undefined): CustomerInfo[
 
 export async function getCustomerByEmail(email: string): Promise<CustomerInfo | null> {
   const data = await adminQuery<{
-    customers: { edges: Array<{ node: { id: string; email: string; firstName: string; lastName: string; tags: string[]; defaultAddress?: { company?: string } } }> }
+    customers: { edges: Array<{ node: { id: string; email: string; firstName: string; lastName: string; metafield?: { value: string } | null; defaultAddress?: { company?: string } } }> }
   }>(
     `query GetCustomerByEmail($q: String!) {
       customers(first: 1, query: $q) {
-        edges { node { id email firstName lastName tags defaultAddress { company } } }
+        edges { node {
+          id email firstName lastName
+          metafield(namespace: "custom", key: "company_name") { value }
+          defaultAddress { company }
+        } }
       }
     }`,
     { q: `email:${email}` }
   );
   const node = data.customers?.edges?.[0]?.node;
   if (!node) return null;
-  const { defaultAddress, tags, ...rest } = node;
-  const company = companyFromTags(tags) ?? defaultAddress?.company ?? null;
+  const { metafield, defaultAddress, ...rest } = node;
+  const company = metafield?.value ?? defaultAddress?.company ?? null;
   return { ...rest, companyContacts: buildCompanyContacts(company) };
 }
 
@@ -126,22 +125,22 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
   }
 
   // Step 1: basic customer lookup (always works with read_customers scope)
-  const basicData = await adminQuery<{ customer: { id: string; email: string; firstName: string; lastName: string; tags: string[]; defaultAddress?: { company?: string } } | null }>(`
+  const basicData = await adminQuery<{ customer: { id: string; email: string; firstName: string; lastName: string; metafield?: { value: string } | null; defaultAddress?: { company?: string } } | null }>(`
     query GetCustomer($id: ID!) {
       customer(id: $id) {
         id
         email
         firstName
         lastName
-        tags
+        metafield(namespace: "custom", key: "company_name") { value }
         defaultAddress { company }
       }
     }
   `, { id: gid });
 
   if (!basicData.customer) return null;
-  const addressCompany = basicData.customer.defaultAddress?.company;
-  const tagCompany = companyFromTags(basicData.customer.tags ?? []);
+  const metafieldCompany = basicData.customer.metafield?.value ?? null;
+  const addressCompany = basicData.customer.defaultAddress?.company ?? null;
 
   // Step 2: try to fetch B2B company contacts (requires read_companies scope)
   // If this fails due to missing scopes or non-B2B store, log and continue with empty contacts.
@@ -202,13 +201,12 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
     }
   }
 
-  // Fall back to tag → address company when B2B contacts unavailable
+  // Fall back to metafield → address company when B2B contacts unavailable
   if (companyContacts.length === 0) {
-    const fallback = tagCompany ?? addressCompany ?? null;
-    companyContacts = buildCompanyContacts(fallback);
+    companyContacts = buildCompanyContacts(metafieldCompany ?? addressCompany);
   }
 
-  const { defaultAddress: _addr, tags: _tags, ...customerFields } = basicData.customer;
+  const { metafield: _mf, defaultAddress: _addr, ...customerFields } = basicData.customer;
   return {
     ...customerFields,
     companyContacts,
