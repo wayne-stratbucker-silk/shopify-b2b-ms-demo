@@ -30,3 +30,4 @@ import "@/components/makeswift/countdown-banner";
 import "@/components/makeswift/testimonial-widget";
 import "@/components/makeswift/rich-document";
 import "@/components/makeswift/plp-interstitial";
+import "@/components/makeswift/not-found-page";
