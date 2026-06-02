@@ -22,9 +22,10 @@ export async function GET(req: Request) {
 
   const jar = await cookies();
   const storedState = jar.get("oauth_state")?.value;
+  const codeVerifier = jar.get("oauth_code_verifier")?.value;
   const returnTo = safeReturnUrl(jar.get("oauth_return_to")?.value, "/account");
 
-  if (error || !code || !state || state !== storedState) {
+  if (error || !code || !state || state !== storedState || !codeVerifier) {
     const loginUrl = new URL("/login", APP_URL);
     loginUrl.searchParams.set("error", error ?? "auth_failed");
     return NextResponse.redirect(loginUrl);
@@ -34,9 +35,10 @@ export async function GET(req: Request) {
   jar.delete("oauth_state");
   jar.delete("oauth_nonce");
   jar.delete("oauth_return_to");
+  jar.delete("oauth_code_verifier");
 
   try {
-    const { idToken } = await exchangeCodeForTokens(code);
+    const { idToken } = await exchangeCodeForTokens(code, codeVerifier);
 
     // Verify the ID token signature using Shopify's JWKS (RS256)
     const { payload } = await jwtVerify(idToken, SHOPIFY_JWKS, { algorithms: ["RS256"] });

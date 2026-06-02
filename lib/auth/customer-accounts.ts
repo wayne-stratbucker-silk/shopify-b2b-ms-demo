@@ -1,11 +1,10 @@
+import { randomBytes, createHash } from "crypto";
 import { adminQuery } from "@/lib/shopify/admin-client";
 import type { Session } from "@/lib/auth/session";
 import { permissionsForRole } from "@/lib/auth/permissions";
 
-const STORE_DOMAIN = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN!;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL!;
 const CLIENT_ID = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID!;
-const CLIENT_SECRET = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_SECRET!;
 
 // Shopify Customer Accounts API OAuth2 endpoints
 // The path identifier must be the numeric shop ID (not the myshopify.com domain name).
@@ -15,7 +14,13 @@ const CUSTOMER_ACCOUNTS_BASE =
   process.env.SHOPIFY_CUSTOMER_ACCOUNTS_BASE_URL ??
   `https://shopify.com/authentication/${SHOP_ID}`;
 
-export function getLoginUrl(state: string, nonce: string): string {
+export function generatePKCE(): { codeVerifier: string; codeChallenge: string } {
+  const codeVerifier = randomBytes(48).toString("base64url");
+  const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
+  return { codeVerifier, codeChallenge };
+}
+
+export function getLoginUrl(state: string, nonce: string, codeChallenge: string): string {
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     response_type: "code",
@@ -23,11 +28,13 @@ export function getLoginUrl(state: string, nonce: string): string {
     scope: "openid email customer-account-api:full",
     state,
     nonce,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
   });
   return `${CUSTOMER_ACCOUNTS_BASE}/oauth/authorize?${params}`;
 }
 
-export async function exchangeCodeForTokens(code: string): Promise<{
+export async function exchangeCodeForTokens(code: string, codeVerifier: string): Promise<{
   accessToken: string;
   refreshToken: string;
   idToken: string;
@@ -39,9 +46,9 @@ export async function exchangeCodeForTokens(code: string): Promise<{
     body: new URLSearchParams({
       grant_type: "authorization_code",
       client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
       code,
       redirect_uri: `${APP_URL}/api/auth/callback`,
+      code_verifier: codeVerifier,
     }),
   });
 
