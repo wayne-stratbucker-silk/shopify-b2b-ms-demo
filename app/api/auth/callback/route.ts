@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { exchangeCodeForTokens, getCustomerWithCompany, buildSession } from "@/lib/auth/customer-accounts";
 import { encodeSession, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "@/lib/auth/session";
+import { permissionsForRole } from "@/lib/auth/permissions";
 import { safeReturnUrl } from "@/lib/auth/safe-return-url";
 import { jwtVerify, createRemoteJWKSet } from "jose";
+import type { Session } from "@/lib/auth/session";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://shopify-b2b-ms-demo.vercel.app";
 const CLIENT_ID = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID!;
@@ -20,7 +22,6 @@ function toLoginUrl(errorCode: string): string {
 }
 
 export async function GET(req: Request) {
-  // Top-level guard: nothing in this handler should cause a 500
   try {
     return await handleCallback(req);
   } catch (err) {
@@ -46,7 +47,6 @@ async function handleCallback(req: Request) {
     return NextResponse.redirect(toLoginUrl(error ?? "auth_failed"));
   }
 
-  // Clear all OAuth cookies before proceeding
   jar.delete("oauth_state");
   jar.delete("oauth_nonce");
   jar.delete("oauth_return_to");
@@ -61,13 +61,12 @@ async function handleCallback(req: Request) {
     return NextResponse.redirect(toLoginUrl("token_exchange_failed"));
   }
 
-  // Validate we received an ID token
   if (!tokens.idToken || typeof tokens.idToken !== "string") {
-    console.error("[auth/callback] no_id_token — token response keys:", Object.keys(tokens));
+    console.error("[auth/callback] no_id_token — keys:", Object.keys(tokens));
     return NextResponse.redirect(toLoginUrl("no_id_token"));
   }
 
-  // Step 2: verify ID token signature, issuer, and audience
+  // Step 2: verify ID token
   let jwtPayload: Record<string, unknown>;
   try {
     const result = await jwtVerify(tokens.idToken, SHOPIFY_JWKS, {
@@ -81,30 +80,55 @@ async function handleCallback(req: Request) {
     return NextResponse.redirect(toLoginUrl("jwt_failed"));
   }
 
-  // Step 3: nonce validation (replay protection)
+  // Step 3: nonce validation
   if (storedNonce && jwtPayload["nonce"] !== storedNonce) {
     console.error("[auth/callback] nonce_mismatch");
     return NextResponse.redirect(toLoginUrl("nonce_mismatch"));
   }
 
-  // Step 4: look up customer + company via Admin API
-  const sub = typeof jwtPayload["sub"] === "string" ? jwtPayload["sub"] : "";
-  const customerId = sub.startsWith("gid://") ? sub : `gid://shopify/Customer/${sub}`;
+  // Extract customer identity from JWT claims
+  const rawSub = typeof jwtPayload["sub"] === "string" ? jwtPayload["sub"] : "";
+  const jwtEmail = typeof jwtPayload["email"] === "string" ? jwtPayload["email"] : "";
+  const jwtFirst = typeof jwtPayload["given_name"] === "string" ? jwtPayload["given_name"] : "";
+  const jwtLast = typeof jwtPayload["family_name"] === "string" ? jwtPayload["family_name"] : "";
+  const jwtName = `${jwtFirst} ${jwtLast}`.trim() || jwtEmail;
 
-  let customer: Awaited<ReturnType<typeof getCustomerWithCompany>>;
+  // Normalize to Admin API Customer GID — the new Customer Account API uses
+  // gid://shopify/CustomerAccount/... but the Admin API expects gid://shopify/Customer/...
+  const numericId = rawSub.split("/").pop() ?? rawSub;
+  const adminCustomerId = rawSub.startsWith("gid://shopify/Customer/") && !rawSub.includes("Account")
+    ? rawSub
+    : `gid://shopify/Customer/${numericId}`;
+
+  // Step 4: try Admin API lookup for B2B company data — fail-safe: always log in
+  let session: Session;
   try {
-    customer = await getCustomerWithCompany(customerId);
+    const customer = await getCustomerWithCompany(adminCustomerId);
+    if (customer) {
+      session = buildSession(customer);
+    } else {
+      // Customer not in Admin API (different store or non-B2B) — use JWT claims
+      console.warn("[auth/callback] customer not found in Admin API, using JWT claims. id:", adminCustomerId);
+      session = {
+        customerId: rawSub,
+        email: jwtEmail,
+        name: jwtName,
+        role: "buyer",
+        permissions: permissionsForRole("buyer"),
+      };
+    }
   } catch (e) {
-    console.error("[auth/callback] customer_lookup_failed:", String(e));
-    return NextResponse.redirect(toLoginUrl("customer_lookup_failed"));
-  }
-  if (!customer) {
-    console.error("[auth/callback] customer_not_found:", customerId);
-    return NextResponse.redirect(toLoginUrl("customer_not_found"));
+    // Admin API failed (scope issue, invalid GID format, etc.) — still allow login
+    console.warn("[auth/callback] Admin API lookup failed, using JWT claims:", String(e));
+    session = {
+      customerId: rawSub,
+      email: jwtEmail,
+      name: jwtName,
+      role: "buyer",
+      permissions: permissionsForRole("buyer"),
+    };
   }
 
-  // Build session and set cookie
-  const session = buildSession(customer);
   const encoded = encodeSession(session);
   const response = NextResponse.redirect(`${APP_URL}${returnTo}`);
   response.cookies.set(SESSION_COOKIE, encoded, SESSION_COOKIE_OPTS);
