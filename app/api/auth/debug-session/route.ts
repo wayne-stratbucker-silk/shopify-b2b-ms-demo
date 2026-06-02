@@ -15,7 +15,7 @@ export async function GET() {
     sessionRole: session.role,
   };
 
-  // Normalize GID the same way getCustomerWithCompany does
+  // Normalize GID
   const rawId = session.customerId;
   let gid: string;
   if (rawId.startsWith("gid://shopify/Customer/") && !rawId.includes("Account")) {
@@ -26,18 +26,30 @@ export async function GET() {
   }
   result.resolvedGid = gid;
 
-  // Step 1: basic customer query
+  // Full customer query — all company-related fields
   try {
-    const basic = await adminQuery<{ customer: { id: string; email: string; firstName: string; lastName: string } | null }>(
-      `query($id: ID!) { customer(id: $id) { id email firstName lastName } }`,
+    const basic = await adminQuery<{ customer: {
+      id: string; email: string; firstName: string; lastName: string;
+      tags: string[];
+      defaultAddress?: { company?: string; address1?: string; city?: string };
+      addresses: { edges: Array<{ node: { company?: string } }> };
+    } | null }>(
+      `query($id: ID!) { customer(id: $id) {
+        id email firstName lastName tags
+        defaultAddress { company address1 city }
+        addresses(first: 5) { edges { node { company } } }
+      } }`,
       { id: gid }
     );
     result.basicCustomer = basic.customer;
+    result.defaultAddressCompany = basic.customer?.defaultAddress?.company ?? null;
+    result.allAddressCompanies = basic.customer?.addresses?.edges?.map(e => e.node.company).filter(Boolean) ?? [];
+    result.tags = basic.customer?.tags ?? [];
   } catch (e) {
     result.basicCustomerError = String(e);
   }
 
-  // Step 2: B2B company contacts
+  // B2B contacts (B2B plan only)
   try {
     const b2b = await adminQuery<{ customer: { companyContacts: { edges: Array<{ node: { id: string; company: { id: string; name: string } } }> } } | null }>(
       `query($id: ID!) { customer(id: $id) { companyContacts(first: 5) { edges { node { id company { id name } } } } } }`,
