@@ -163,10 +163,12 @@ export function buildSession(customer: CustomerInfo): Session {
   const roleName = firstAssignment?.role?.name?.toLowerCase() ?? "buyer";
   const role: "admin" | "buyer" = roleName === "admin" ? "admin" : "buyer";
 
+  const displayName = `${customer.firstName} ${customer.lastName}`.trim();
+
   return {
     customerId: customer.id,
     email: customer.email,
-    name: `${customer.firstName} ${customer.lastName}`.trim(),
+    name: displayName,
     companyId: contact?.company?.id,
     companyName: contact?.company?.name,
     companyExternalId: contact?.company?.externalId ?? undefined,

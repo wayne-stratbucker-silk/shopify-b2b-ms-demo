@@ -66,7 +66,9 @@ export default async function AccountDashboard() {
   const session = await getSession();
   if (!session) return null;
 
-  const firstName = session.name.split(" ")[0];
+  const firstName = session.name && !session.name.includes("@")
+    ? session.name.split(" ")[0]
+    : session.email.split("@")[0];
 
   const [orders, salesRep] = await Promise.all([
     session.companyId ? getRecentOrders(session.companyId) : Promise.resolve([]),
