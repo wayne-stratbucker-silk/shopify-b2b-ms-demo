@@ -82,18 +82,23 @@ interface CustomerInfo {
 
 export async function getCustomerByEmail(email: string): Promise<CustomerInfo | null> {
   const data = await adminQuery<{
-    customers: { edges: Array<{ node: { id: string; email: string; firstName: string; lastName: string } }> }
+    customers: { edges: Array<{ node: { id: string; email: string; firstName: string; lastName: string; defaultAddress?: { company?: string } } }> }
   }>(
     `query GetCustomerByEmail($q: String!) {
       customers(first: 1, query: $q) {
-        edges { node { id email firstName lastName } }
+        edges { node { id email firstName lastName defaultAddress { company } } }
       }
     }`,
     { q: `email:${email}` }
   );
   const node = data.customers?.edges?.[0]?.node;
   if (!node) return null;
-  return { ...node, companyContacts: [] };
+  const { defaultAddress, ...rest } = node;
+  return { ...rest, companyContacts: defaultAddress?.company ? [{
+    id: "default",
+    company: { id: "default", name: defaultAddress.company, externalId: null },
+    roleAssignments: [],
+  }] : [] };
 }
 
 export async function getCustomerWithCompany(customerId: string): Promise<CustomerInfo | null> {
@@ -114,18 +119,20 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
   }
 
   // Step 1: basic customer lookup (always works with read_customers scope)
-  const basicData = await adminQuery<{ customer: { id: string; email: string; firstName: string; lastName: string } | null }>(`
+  const basicData = await adminQuery<{ customer: { id: string; email: string; firstName: string; lastName: string; defaultAddress?: { company?: string } } | null }>(`
     query GetCustomer($id: ID!) {
       customer(id: $id) {
         id
         email
         firstName
         lastName
+        defaultAddress { company }
       }
     }
   `, { id: gid });
 
   if (!basicData.customer) return null;
+  const addressCompany = basicData.customer.defaultAddress?.company;
 
   // Step 2: try to fetch B2B company contacts (requires read_companies scope)
   // If this fails due to missing scopes or non-B2B store, log and continue with empty contacts.
@@ -180,14 +187,24 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
   } catch (e) {
     const msg = String(e);
     if (msg.includes("doesn't exist on type") || msg.includes("undefinedField")) {
-      console.warn("[customer-accounts] B2B companyContacts field not available (store may not be on B2B plan)");
+      console.warn("[customer-accounts] B2B companyContacts field not available (store not on B2B plan) — using address company fallback");
     } else {
       console.warn("[customer-accounts] B2B company query failed:", msg);
     }
   }
 
+  // Fall back to address company when B2B contacts are unavailable
+  if (companyContacts.length === 0 && addressCompany) {
+    companyContacts = [{
+      id: "default",
+      company: { id: "default", name: addressCompany, externalId: null },
+      roleAssignments: [],
+    }];
+  }
+
+  const { defaultAddress: _addr, ...customerFields } = basicData.customer;
   return {
-    ...basicData.customer,
+    ...customerFields,
     companyContacts,
   };
 }

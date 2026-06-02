@@ -6,8 +6,16 @@ export const dynamic = "force-dynamic";
 
 interface SalesRep { name: string; title: string; email?: string; phone?: string; initials: string }
 
-async function getRecentOrders(companyId: string) {
-  const id = companyId.replace("gid://shopify/Company/", "");
+async function getRecentOrders(companyId: string | undefined, customerId: string) {
+  let query: string;
+  if (companyId && companyId !== "default") {
+    const id = companyId.replace("gid://shopify/Company/", "");
+    query = `company_id:${id}`;
+  } else {
+    // Fall back to customer-level order lookup
+    const numId = customerId.replace("gid://shopify/Customer/", "");
+    query = `customer_id:${numId}`;
+  }
   const data = await adminQuery<{
     orders: { edges: Array<{ node: { id: string; name: string; createdAt: string; totalPriceSet: { shopMoney: { amount: string; currencyCode: string } }; displayFinancialStatus: string } }> };
   }>(
@@ -16,7 +24,7 @@ async function getRecentOrders(companyId: string) {
         edges { node { id name createdAt displayFinancialStatus totalPriceSet { shopMoney { amount currencyCode } } } }
       }
     }`,
-    { query: `company_id:${id}` }
+    { query }
   ).catch(() => ({ orders: { edges: [] } }));
   return data.orders.edges.map(e => e.node);
 }
@@ -71,8 +79,10 @@ export default async function AccountDashboard() {
     : session.email.split("@")[0];
 
   const [orders, salesRep] = await Promise.all([
-    session.companyId ? getRecentOrders(session.companyId) : Promise.resolve([]),
-    session.companyId ? getSalesRep(session.companyId) : Promise.resolve(null),
+    getRecentOrders(session.companyId, session.customerId),
+    session.companyId && session.companyId !== "default"
+      ? getSalesRep(session.companyId)
+      : Promise.resolve(null),
   ]);
 
   return (

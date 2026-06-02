@@ -33,9 +33,15 @@ interface ShopifyOrder {
   lineItems: { edges: Array<{ node: { title: string } }> };
 }
 
-async function fetchOrders(companyId: string, viewAll: boolean, email: string): Promise<ShopifyOrder[]> {
-  const id = companyId.replace("gid://shopify/Company/", "");
-  const query = viewAll ? `company_id:${id}` : `company_id:${id} email:${email}`;
+async function fetchOrders(companyId: string | undefined, customerId: string, viewAll: boolean, email: string): Promise<ShopifyOrder[]> {
+  let query: string;
+  if (companyId && companyId !== "default") {
+    const id = companyId.replace("gid://shopify/Company/", "");
+    query = viewAll ? `company_id:${id}` : `company_id:${id} email:${email}`;
+  } else {
+    const numId = customerId.replace("gid://shopify/Customer/", "");
+    query = `customer_id:${numId}`;
+  }
   const data = await adminQuery<{ orders: { edges: Array<{ node: ShopifyOrder }> } }>(
     `query GetOrders($query: String!) {
       orders(first: 50, query: $query, sortKey: CREATED_AT, reverse: true) {
@@ -62,7 +68,7 @@ export default async function OrdersPage({ searchParams }: Props) {
   const canViewAll = hasPermission(session.permissions, "company.orders.view_all");
   const showAll = view === "all" && canViewAll;
 
-  const orders = session.companyId ? await fetchOrders(session.companyId, showAll, session.email) : [];
+  const orders = await fetchOrders(session.companyId, session.customerId, showAll, session.email);
 
   const now = new Date();
   const thisMonth = now.getMonth();
