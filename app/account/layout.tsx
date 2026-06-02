@@ -7,6 +7,7 @@ import { Footer } from "@/components/footer";
 import { AccountNav } from "@/components/account-nav";
 import { ToastProvider } from "@/components/ui/toast";
 import { getSession } from "@/lib/auth/session";
+import { SessionRefresher } from "./session-refresher";
 import "@/components/makeswift/header-nav";
 import "@/components/makeswift/footer-nav";
 
@@ -28,8 +29,15 @@ export default async function AccountLayout({ children }: { children: React.Reac
     repName: "",
   };
 
+  // Trigger a silent session refresh if company/name data is missing.
+  // SessionRefresher calls POST /api/auth/refresh-session on mount (client-side),
+  // sets the updated cookie via that Route Handler, then calls router.refresh()
+  // so all Server Components re-render with the corrected session.
+  const needsRefresh = !session.companyId || !session.companyName || session.name.includes("@");
+
   return (
     <ToastProvider>
+      <SessionRefresher needsRefresh={needsRefresh} />
       <Header accountInfo={accountInfo} />
       {headerSnap && <MakeswiftComponent snapshot={headerSnap} label="Header Navigation" type="acme/header-nav" />}
       <div className="container">

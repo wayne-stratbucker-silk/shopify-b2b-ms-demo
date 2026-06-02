@@ -80,22 +80,67 @@ interface CustomerInfo {
   }>;
 }
 
+function buildCompanyContacts(company: string | null | undefined): CustomerInfo["companyContacts"] {
+  if (!company) return [];
+  return [{ id: "default", company: { id: "default", name: company, externalId: null }, roleAssignments: [] }];
+}
+
+export async function getCustomerByEmail(email: string): Promise<CustomerInfo | null> {
+  const data = await adminQuery<{
+    customers: { edges: Array<{ node: { id: string; email: string; firstName: string; lastName: string; metafield?: { value: string } | null; defaultAddress?: { company?: string } } }> }
+  }>(
+    `query GetCustomerByEmail($q: String!) {
+      customers(first: 1, query: $q) {
+        edges { node {
+          id email firstName lastName
+          metafield(namespace: "custom", key: "company_name") { value }
+          defaultAddress { company }
+        } }
+      }
+    }`,
+    { q: `email:${email}` }
+  );
+  const node = data.customers?.edges?.[0]?.node;
+  if (!node) return null;
+  const { metafield, defaultAddress, ...rest } = node;
+  const company = metafield?.value ?? defaultAddress?.company ?? null;
+  return { ...rest, companyContacts: buildCompanyContacts(company) };
+}
+
 export async function getCustomerWithCompany(customerId: string): Promise<CustomerInfo | null> {
-  const gid = customerId.startsWith("gid://") ? customerId : `gid://shopify/Customer/${customerId}`;
+  // Normalize to Admin API format: gid://shopify/Customer/{id}
+  // The JWT sub uses gid://shopify/CustomerAccount/... — strip to numeric ID and rebuild.
+  let gid: string;
+  if (customerId.startsWith("gid://shopify/Customer/") && !customerId.includes("Account")) {
+    gid = customerId;
+  } else {
+    const numericId = customerId.split("/").pop() ?? customerId;
+    gid = `gid://shopify/Customer/${numericId}`;
+  }
+
+  // Guard: if the GID has no numeric ID, fall back to email-based lookup upstream
+  const numericPart = gid.replace("gid://shopify/Customer/", "");
+  if (!numericPart || !/^\d+$/.test(numericPart)) {
+    throw new Error(`Invalid customer GID (no numeric ID): ${gid}`);
+  }
 
   // Step 1: basic customer lookup (always works with read_customers scope)
-  const basicData = await adminQuery<{ customer: { id: string; email: string; firstName: string; lastName: string } | null }>(`
+  const basicData = await adminQuery<{ customer: { id: string; email: string; firstName: string; lastName: string; metafield?: { value: string } | null; defaultAddress?: { company?: string } } | null }>(`
     query GetCustomer($id: ID!) {
       customer(id: $id) {
         id
         email
         firstName
         lastName
+        metafield(namespace: "custom", key: "company_name") { value }
+        defaultAddress { company }
       }
     }
   `, { id: gid });
 
   if (!basicData.customer) return null;
+  const metafieldCompany = basicData.customer.metafield?.value ?? null;
+  const addressCompany = basicData.customer.defaultAddress?.company ?? null;
 
   // Step 2: try to fetch B2B company contacts (requires read_companies scope)
   // If this fails due to missing scopes or non-B2B store, log and continue with empty contacts.
@@ -148,11 +193,22 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
       }));
     }
   } catch (e) {
-    console.warn("[customer-accounts] B2B company query failed (token may lack read_companies scope):", String(e));
+    const msg = String(e);
+    if (msg.includes("doesn't exist on type") || msg.includes("undefinedField")) {
+      console.warn("[customer-accounts] B2B companyContacts field not available (store not on B2B plan) — using address company fallback");
+    } else {
+      console.warn("[customer-accounts] B2B company query failed:", msg);
+    }
   }
 
+  // Fall back to metafield → address company when B2B contacts unavailable
+  if (companyContacts.length === 0) {
+    companyContacts = buildCompanyContacts(metafieldCompany ?? addressCompany);
+  }
+
+  const { metafield: _mf, defaultAddress: _addr, ...customerFields } = basicData.customer;
   return {
-    ...basicData.customer,
+    ...customerFields,
     companyContacts,
   };
 }
@@ -163,10 +219,12 @@ export function buildSession(customer: CustomerInfo): Session {
   const roleName = firstAssignment?.role?.name?.toLowerCase() ?? "buyer";
   const role: "admin" | "buyer" = roleName === "admin" ? "admin" : "buyer";
 
+  const displayName = `${customer.firstName} ${customer.lastName}`.trim();
+
   return {
     customerId: customer.id,
     email: customer.email,
-    name: `${customer.firstName} ${customer.lastName}`.trim(),
+    name: displayName,
     companyId: contact?.company?.id,
     companyName: contact?.company?.name,
     companyExternalId: contact?.company?.externalId ?? undefined,

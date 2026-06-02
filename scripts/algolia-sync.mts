@@ -31,7 +31,8 @@ interface AlgoliaRecord {
   price: number;
   compareAtPrice?: number;
   imageUrl?: string;
-  category: string;
+  category: string;       // first collection handle (kept for backward compat)
+  collections: string[];  // all collection handles
   inStock: boolean;
   totalInventory: number;
   uom: string;
@@ -83,7 +84,7 @@ async function fetchAllProducts(): Promise<ShopifyProduct[]> {
                   node {
                     id handle title vendor tags
                     featuredImage { url }
-                    collections(first: 1) { edges { node { handle } } }
+                    collections(first: 50) { edges { node { handle } } }
                     variants(first: 5) {
                       edges {
                         node {
@@ -128,7 +129,8 @@ async function fetchAllProducts(): Promise<ShopifyProduct[]> {
 
 function toAlgoliaRecord(product: ShopifyProduct): AlgoliaRecord {
   const defaultVariant = product.variants.edges[0]?.node;
-  const category = product.collections.edges[0]?.node?.handle ?? "uncategorized";
+  const collectionHandles = product.collections.edges.map(e => e.node.handle);
+  const category = collectionHandles[0] ?? "uncategorized";
   const totalInventory = product.variants.edges.reduce(
     (sum, e) => sum + (e.node.inventoryQuantity ?? 0),
     0
@@ -145,6 +147,7 @@ function toAlgoliaRecord(product: ShopifyProduct): AlgoliaRecord {
     compareAtPrice: defaultVariant?.compareAtPrice ? parseFloat(defaultVariant.compareAtPrice) : undefined,
     imageUrl: product.featuredImage?.url,
     category,
+    collections: collectionHandles,
     inStock: product.variants.edges.some(e => e.node.availableForSale),
     totalInventory,
     uom,
@@ -163,6 +166,7 @@ async function main() {
       attributesForFaceting: [
         "searchable(brand)",
         "filterOnly(category)",
+        "filterOnly(collections)",
         "filterOnly(inStock)",
         "tags",
         "uom",

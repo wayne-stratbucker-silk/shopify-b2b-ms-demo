@@ -119,7 +119,7 @@ async function handleCallback(req: Request) {
   } catch (e) {
     console.warn("[auth/callback] Admin API lookup failed, using JWT claims:", String(e));
     session = {
-      customerId: rawSub,
+      customerId: adminCustomerId, // use the normalized Admin API GID, not the raw JWT sub
       email: jwtEmail,
       name: jwtName,
       role: "buyer",

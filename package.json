@@ -12,7 +12,8 @@
     "algolia-sync": "node --env-file=.env.local --import tsx/esm scripts/algolia-sync.mts",
     "register-webhooks": "node --env-file=.env.local --import tsx/esm scripts/register-webhooks.mts",
     "seed:v2": "node --env-file=.env.local --import tsx/esm scripts/shopify-seed-v2.mts",
-    "seed:catalog": "node --env-file=.env.local --import tsx/esm scripts/shopify-seed-catalog.mts"
+    "seed:catalog": "node --env-file=.env.local --import tsx/esm scripts/shopify-seed-catalog.mts",
+    "seed:orders:acme": "node --env-file=.env.local --import tsx/esm scripts/seed-orders-acme.mts"
   },
   "dependencies": {
     "@algolia/autocomplete-js": "^1.19.8",

@@ -33,9 +33,15 @@ interface ShopifyOrder {
   lineItems: { edges: Array<{ node: { title: string } }> };
 }
 
-async function fetchOrders(companyId: string, viewAll: boolean, email: string): Promise<ShopifyOrder[]> {
-  const id = companyId.replace("gid://shopify/Company/", "");
-  const query = viewAll ? `company_id:${id}` : `company_id:${id} email:${email}`;
+async function fetchOrders(companyId: string | undefined, customerId: string, viewAll: boolean, email: string): Promise<ShopifyOrder[]> {
+  let query: string;
+  if (companyId && companyId !== "default") {
+    const id = companyId.replace("gid://shopify/Company/", "");
+    query = viewAll ? `company_id:${id}` : `company_id:${id} email:${email}`;
+  } else {
+    const numId = customerId.replace("gid://shopify/Customer/", "");
+    query = `customer_id:${numId}`;
+  }
   const data = await adminQuery<{ orders: { edges: Array<{ node: ShopifyOrder }> } }>(
     `query GetOrders($query: String!) {
       orders(first: 50, query: $query, sortKey: CREATED_AT, reverse: true) {
@@ -62,7 +68,7 @@ export default async function OrdersPage({ searchParams }: Props) {
   const canViewAll = hasPermission(session.permissions, "company.orders.view_all");
   const showAll = view === "all" && canViewAll;
 
-  const orders = session.companyId ? await fetchOrders(session.companyId, showAll, session.email) : [];
+  const orders = await fetchOrders(session.companyId, session.customerId, showAll, session.email);
 
   const now = new Date();
   const thisMonth = now.getMonth();
@@ -143,7 +149,7 @@ export default async function OrdersPage({ searchParams }: Props) {
               return (
                 <tr key={order.id}>
                   <td className="col-primary">
-                    <Link href={`/account/orders/${encodeURIComponent(order.id)}`} className="tbl row-link">{order.name}</Link>
+                    <Link href={`/account/orders/${order.id.split('/').pop()}`} className="tbl row-link">{order.name}</Link>
                   </td>
                   <td className="col-meta muted">{fmtDate(order.createdAt)}</td>
                   <td className="col-meta">{buyer || "—"}</td>
@@ -155,7 +161,7 @@ export default async function OrdersPage({ searchParams }: Props) {
                   </td>
                   <td className="col-value num">{fmt(amt, order.totalPriceSet.shopMoney.currencyCode)}</td>
                   <td className="col-action">
-                    <Link href={`/account/orders/${encodeURIComponent(order.id)}`} className="btn btn-ghost btn-xs">
+                    <Link href={`/account/orders/${order.id.split('/').pop()}`} className="btn btn-ghost btn-xs">
                       View
                     </Link>
                   </td>
