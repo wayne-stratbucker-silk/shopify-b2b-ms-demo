@@ -5,7 +5,15 @@ import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getQuotesForCompany, getQuotesForCustomer } from "@/lib/quotes/client";
 import { QUOTE_CART_COOKIE } from "@/lib/quotes/quote-cart";
+import { Icon } from "@/components/ui/icons";
 import type { Quote, QuoteStatus } from "@/types";
+
+function isExpiringSoon(dateStr: string, withinDays = 7): boolean {
+  try {
+    const msLeft = new Date(dateStr).getTime() - Date.now();
+    return msLeft > 0 && msLeft / 86400000 < withinDays;
+  } catch { return false; }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -56,8 +64,23 @@ export default async function QuotesPage({ searchParams }: Props) {
   const jar = await cookies();
   const hasQuoteCart = !!jar.get(QUOTE_CART_COOKIE)?.value;
 
+  const soonExpiring = quotes.filter(
+    (q) => q.expires && q.status === "in_process" && isExpiringSoon(q.expires),
+  );
+
   return (
     <div>
+      {soonExpiring.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "var(--warn-fade, #fff7e8)", border: "1px solid var(--warn, #f59e0b)", borderRadius: "var(--radius-card)", marginBottom: 20, fontSize: 13 }}>
+          <Icon name="alert" size={16} style={{ color: "var(--warn, #f59e0b)", flexShrink: 0 }} />
+          <span>
+            <strong>{soonExpiring.length} quote{soonExpiring.length > 1 ? "s" : ""}</strong>{" "}
+            {soonExpiring.length > 1 ? "are" : "is"} expiring within 7 days — review and accept before{" "}
+            {soonExpiring.length > 1 ? "they lapse" : "it lapses"}.
+          </span>
+        </div>
+      )}
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <h1 className="text-h1">Quotes</h1>
         <div style={{ display: "flex", gap: 8 }}>
@@ -104,7 +127,12 @@ export default async function QuotesPage({ searchParams }: Props) {
                   <td style={{ fontWeight: 600 }}>{q.draftOrderName}</td>
                   <td className="text-sm">{fmtDate(q.date)}</td>
                   <td className="text-sm">{q.title || "—"}</td>
-                  <td><span className={`status ${STATUS_CLS[q.status]}`}>{STATUS_LABELS[q.status]}</span></td>
+                  <td>
+                    <span className={`status ${STATUS_CLS[q.status]}`}>{STATUS_LABELS[q.status]}</span>
+                    {q.expires && isExpiringSoon(q.expires) && (
+                      <span className="status warn" style={{ marginLeft: 6, fontSize: 10 }}>Expires soon</span>
+                    )}
+                  </td>
                   <td style={{ fontWeight: 600 }}>{q.total > 0 ? fmt(q.total) : "—"}</td>
                   <td className="text-sm">{q.expires ? fmtDate(q.expires) : "—"}</td>
                   <td>

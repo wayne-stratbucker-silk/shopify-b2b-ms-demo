@@ -44,6 +44,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/account/users",       label: "Users & roles",  ic: "users",     matches: ["/account/users"] },
       { href: "/account/addresses",   label: "Addresses",      ic: "pin",       matches: ["/account/addresses"] },
+      { href: "/account/settings",    label: "Settings",       ic: "settings",  matches: ["/account/settings"] },
     ],
   },
 ];

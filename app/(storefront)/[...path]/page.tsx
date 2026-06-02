@@ -1,13 +1,14 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Page } from "@makeswift/runtime/next";
 import { getSiteVersion } from "@makeswift/runtime/next/server";
 import { client } from "@/lib/makeswift/client";
-import { getCollectionProducts } from "@/lib/shopify/queries/products";
-import { mapProduct } from "@/lib/shopify/product-fetcher";
-import { ProductCard } from "@/components/product-card";
-import { getSession } from "@/lib/auth/session";
-import type { BuyerContext } from "@/lib/shopify/storefront-client";
+import { getCollectionMeta } from "@/lib/shopify/queries/products";
+import { fetchCollectionPLP } from "@/lib/algolia/collection-products";
+import { FacetedPlp } from "@/components/faceted-plp";
 import "@/components/makeswift/register";
+
+export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{ path: string[] }>;
@@ -26,35 +27,53 @@ export default async function CatchAllPage({ params }: Props) {
   // 2. Try as a collection handle (strip "collections/" prefix if present)
   const collectionHandle = slug.replace(/^collections\//, "");
 
-  const session = await getSession().catch(() => null);
-  const buyer: BuyerContext | undefined = session?.companyLocationId
-    ? { companyLocationId: session.companyLocationId }
-    : undefined;
+  const [meta, plp] = await Promise.all([
+    getCollectionMeta(collectionHandle).catch(() => null),
+    fetchCollectionPLP(collectionHandle).catch(() => null),
+  ]);
 
-  const collection = await getCollectionProducts(collectionHandle, 24, undefined, buyer).catch(() => null);
-  if (collection) {
-    const products = collection.products.edges.map(e => mapProduct(e.node));
+  if (meta) {
+    // Derive a readable parent name from the URL path when the collection is
+    // nested (e.g. /electrical/wire-cable → parent = "Electrical").
+    const parentSlug = path.length >= 2 ? path[0] : null;
+    const parentName = parentSlug
+      ? parentSlug.split("-").map((w) => (w[0] ?? "").toUpperCase() + w.slice(1)).join(" ")
+      : null;
+
     return (
-      <div>
-        <section className="section-tight" style={{ background: "var(--bg-alt)", borderBottom: "1px solid var(--line)" }}>
-          <div className="container">
-            <h1 className="text-h1">{collection.title}</h1>
-            {collection.description && (
-              <p className="text-body" style={{ color: "var(--muted)", marginTop: 8 }}>{collection.description}</p>
+      <div className="container">
+        {/* Breadcrumb */}
+        <div className="crumbs" style={{ padding: "18px 0 0" }}>
+          <Link href="/">Home</Link>
+          <span className="sep">/</span>
+          {parentName && (
+            <>
+              <span style={{ color: "var(--ink-2)" }}>{parentName}</span>
+              <span className="sep">/</span>
+            </>
+          )}
+          <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{meta.title}</span>
+        </div>
+
+        {/* Page heading */}
+        <div className="page-h" style={{ marginTop: 12 }}>
+          <div>
+            <h1>{meta.title}</h1>
+            {meta.description && (
+              <p className="sub">{meta.description}</p>
             )}
           </div>
-        </section>
-        <section className="section">
-          <div className="container">
-            {products.length === 0 ? (
-              <p style={{ color: "var(--muted)" }}>No products in this collection yet.</p>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
-                {products.map(p => <ProductCard key={p.id} product={p} />)}
-              </div>
-            )}
-          </div>
-        </section>
+        </div>
+
+        {/* Faceted product grid */}
+        <FacetedPlp
+          listName={meta.title}
+          filter={{ kind: "collection", collectionHandle }}
+          initialProducts={plp?.products ?? []}
+          initialFacets={plp?.facets}
+          initialFacetDefs={plp?.facetDefs}
+          initialNbHits={plp?.nbHits}
+        />
       </div>
     );
   }

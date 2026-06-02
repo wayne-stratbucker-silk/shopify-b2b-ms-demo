@@ -18,6 +18,9 @@ const PRODUCT_FIELDS = `
   compareAtPriceRange {
     minVariantPrice { amount currencyCode }
   }
+  collections(first: 1) {
+    edges { node { handle title } }
+  }
   variants(first: 50) {
     edges {
       node {
@@ -25,6 +28,7 @@ const PRODUCT_FIELDS = `
         sku
         title
         availableForSale
+        quantityAvailable
         price { amount currencyCode }
         compareAtPrice { amount currencyCode }
         selectedOptions { name value }
@@ -33,10 +37,14 @@ const PRODUCT_FIELDS = `
   }
   metafields(identifiers: [
     { namespace: "custom", key: "uom" },
+    { namespace: "custom", key: "pricing_tiers" },
     { namespace: "custom", key: "lead_time" },
     { namespace: "custom", key: "spec_sheet_url" },
     { namespace: "custom", key: "install_guide_url" },
-    { namespace: "custom", key: "cad_file_url" }
+    { namespace: "custom", key: "cad_file_url" },
+    { namespace: "custom", key: "product_specs" },
+    { namespace: "custom", key: "warranty" },
+    { namespace: "custom", key: "msrp" }
   ]) {
     namespace
     key
@@ -76,6 +84,20 @@ export async function getCollectionProducts(
     { handle, first, after },
     buyer,
     [`collection:${handle}`],
+  );
+  return data.collection;
+}
+
+export async function getCollectionMeta(handle: string): Promise<{ title: string; description?: string } | null> {
+  const data = await storefrontQuery<{
+    collection: { title: string; description?: string } | null;
+  }>(
+    `query GetCollectionMeta($handle: String!) {
+      collection(handle: $handle) { title description }
+    }`,
+    { handle },
+    undefined,
+    [`collection-meta:${handle}`],
   );
   return data.collection;
 }

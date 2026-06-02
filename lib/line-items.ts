@@ -1,15 +1,12 @@
 // ─── Canonical LineItem adapters ───────────────────────────────────────────────
 //
 // `toLineItem` accepts the most common source shapes we have on the storefront —
-// a fully-typed `Product`, an Algolia-normalized hit, or an opaque record — and
-// produces a canonical `LineItem`. Use it whenever an action needs to hand a
-// product+quantity off to a downstream surface (cart, quote, list).
-//
-// Phase A: introduced additively. Phase B routes call sites here.
+// a fully-typed `Product` or an Algolia-normalized hit — and produces a canonical
+// `LineItem`.
 
 import type { LineItem } from "@/types/line-item";
 import type { Product } from "@/types";
-import type { ShopifyConnectorHit } from "@/lib/algolia/connector-hit";
+import type { RawShopifyHit } from "@/lib/algolia/connector-hit";
 
 export interface ToLineItemOpts {
   quantity?: number;
@@ -23,46 +20,37 @@ export interface ToLineItemOpts {
 /** Build a canonical LineItem from a hydrated `Product`. */
 export function toLineItem(product: Product, opts?: ToLineItemOpts): LineItem;
 /** Build a canonical LineItem from a normalized Algolia hit. */
-export function toLineItem(hit: ShopifyConnectorHit, opts?: ToLineItemOpts): LineItem;
+export function toLineItem(hit: RawShopifyHit, opts?: ToLineItemOpts): LineItem;
 export function toLineItem(
-  source: Product | ShopifyConnectorHit,
+  source: Product | RawShopifyHit,
   opts: ToLineItemOpts = {},
 ): LineItem {
-  const isProduct = "id" in source && typeof (source as Product).id === "string";
-  const productId = isProduct
-    ? parseInt((source as Product).id, 10)
-    : Number((source as ShopifyConnectorHit).id ?? 0);
+  const isProduct = "id" in source && typeof (source as Product).id === "string"
+    && (source as Product).id.startsWith("gid://");
 
   const unitPrice = opts.unitPrice ?? (source as { price?: number }).price ?? 0;
-  const listPrice = (source as { listPrice?: number; compare_at_price?: number }).listPrice
-    ?? (source as ShopifyConnectorHit).compare_at_price
+  const listPrice = (source as { listPrice?: number; compareAtPrice?: number }).listPrice
+    ?? (source as RawShopifyHit).compareAtPrice
     ?? undefined;
 
-  // customerSku lives on Product; ShopifyConnectorHit doesn't carry it (overlay
-  // happens client-side after the hit returns). Caller may pass explicitly.
   const customerSku =
     opts.customerSku ?? (isProduct ? (source as Product).customerSku : undefined);
 
   return {
-    productId: Number.isFinite(productId) ? productId : 0,
+    productId: 0,
     variantId: opts.variantId,
-    sku: source.sku ?? "",
+    sku: (source as { sku?: string }).sku ?? "",
     customerSku,
-    name: (source as { name?: string; title?: string }).name ?? (source as ShopifyConnectorHit).title ?? "",
+    name: (source as { name?: string }).name ?? "",
     quantity: Math.max(1, Math.floor(opts.quantity ?? 1)),
     unitPrice,
     listPrice,
-    imageUrl: pickImage(source, isProduct),
+    imageUrl: isProduct ? pickProductImage(source as Product) : (source as RawShopifyHit).imageUrl,
   };
 }
 
-function pickImage(source: Product | ShopifyConnectorHit, isProduct: boolean): string | undefined {
-  if (isProduct) {
-    const p = source as Product;
-    if (p.images && p.images.length > 0) return p.images[0];
-    if (p.galleryImages && p.galleryImages.length > 0) return p.galleryImages[0].url;
-    return undefined;
-  }
-  const h = source as ShopifyConnectorHit;
-  return h.image ?? undefined;
+function pickProductImage(p: Product): string | undefined {
+  if (p.images && p.images.length > 0) return p.images[0];
+  if (p.galleryImages && p.galleryImages.length > 0) return p.galleryImages[0].url;
+  return undefined;
 }

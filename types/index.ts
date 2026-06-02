@@ -28,6 +28,7 @@ export interface Product {
   price: number;
   listPrice: number;
   wasSalePrice?: number;
+  msrp?: number;
   uom: string;                // unit of measure from product metafield
   stockQty: number;
   leadTime: string;
@@ -158,6 +159,12 @@ export interface QuoteItem {
   total: number;
   variantId?: string;
   imageUrl?: string;
+  /** Shopify Draft Order line item GID — used for inline price editing. */
+  lineItemId?: string;
+  /** Shopify Product GID — used for quote duplication. */
+  productId?: string;
+  /** Product handle — used for quote duplication. */
+  productHandle?: string;
 }
 
 export interface QuoteMessage {
@@ -261,6 +268,7 @@ export interface ShopifyProduct {
   images: { edges: Array<{ node: { url: string; altText?: string } }> };
   priceRange: { minVariantPrice: { amount: string; currencyCode: string } };
   compareAtPriceRange?: { minVariantPrice: { amount: string; currencyCode: string } };
+  collections?: { edges: Array<{ node: { handle: string; title: string } }> };
   variants: {
     edges: Array<{
       node: {

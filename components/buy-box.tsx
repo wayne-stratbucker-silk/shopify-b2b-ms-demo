@@ -115,9 +115,10 @@ export function BuyBox({ product: p, isLoggedIn, variantId, forceOutOfStock = fa
   const unitPrice = p.tiers[activeTierIdx]?.unitPrice ?? p.price;
   const subtotal = unitPrice * qty;
 
+  const msrpForSavings = p.msrp ?? p.listPrice;
   const savingsPct =
-    p.listPrice > 0
-      ? Math.round((1 - unitPrice / p.listPrice) * 100)
+    msrpForSavings > 0 && msrpForSavings > unitPrice
+      ? Math.round((1 - unitPrice / msrpForSavings) * 100)
       : 0;
 
   function decrement() { setQty((q) => Math.max(1, q - 1)); }
@@ -218,11 +219,10 @@ export function BuyBox({ product: p, isLoggedIn, variantId, forceOutOfStock = fa
           </div>
         )}
 
-        {/* MSRP line — only when MSRP is ABOVE the selling price (customer-
-            specific or regular). Hidden when MSRP <= price (no markup to show). */}
-        {p.listPrice > unitPrice && (
+        {/* MSRP line — shows manufacturer list price when available and above selling price */}
+        {p.msrp && p.msrp > unitPrice && (
           <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-            MSRP ${p.listPrice.toFixed(2)}
+            MSRP <span style={{ textDecoration: "line-through" }}>${p.msrp.toFixed(2)}</span>
           </div>
         )}
       </div>

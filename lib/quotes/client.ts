@@ -13,6 +13,7 @@ const DRAFT_ORDER_FIELDS = `
   updatedAt
   invoiceUrl
   totalPriceSet { shopMoney { amount currencyCode } }
+  shippingAddress { firstName lastName company address1 address2 city province zip country phone }
   lineItems(first: 50) {
     edges {
       node {
@@ -21,7 +22,7 @@ const DRAFT_ORDER_FIELDS = `
         quantity
         originalUnitPriceSet { shopMoney { amount } }
         discountedUnitPriceSet { shopMoney { amount } }
-        variant { id sku product { handle title vendor featuredImage { url } } }
+        variant { id sku product { id handle title vendor featuredImage { url } } }
       }
     }
   }
@@ -87,6 +88,9 @@ function mapDraftOrder(node: any): Quote {
     total: e.node.quantity * parseFloat(e.node.discountedUnitPriceSet?.shopMoney?.amount ?? "0"),
     variantId: e.node.variant?.id,
     imageUrl: e.node.variant?.product?.featuredImage?.url,
+    lineItemId: e.node.id,
+    productId: e.node.variant?.product?.id,
+    productHandle: e.node.variant?.product?.handle,
   }));
 
   const allowCheckout = status === "in_process" && !!node.invoiceUrl;
@@ -157,6 +161,19 @@ export async function getQuotesForCustomer(customerId: string, first = 50): Prom
   return data.draftOrders.edges.map((e) => mapDraftOrder(e.node));
 }
 
+export interface MailingAddressInput {
+  firstName?: string;
+  lastName?: string;
+  company?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  province?: string;
+  zip?: string;
+  country?: string;
+  phone?: string;
+}
+
 export interface CreateQuoteInput {
   lineItems: Array<{
     variantId: string;
@@ -173,6 +190,8 @@ export interface CreateQuoteInput {
   poNumber?: string;
   notes?: string;
   expiresAt?: string;
+  shippingAddress?: MailingAddressInput;
+  billingAddress?: MailingAddressInput;
 }
 
 export async function createQuote(input: CreateQuoteInput): Promise<{ id: string; name: string }> {
@@ -204,6 +223,8 @@ export async function createQuote(input: CreateQuoteInput): Promise<{ id: string
           : undefined,
         poNumber: input.poNumber,
         note: input.notes,
+        shippingAddress: input.shippingAddress,
+        billingAddress: input.billingAddress,
         tags: [QUOTE_TAG],
         metafields: [
           { namespace: QUOTE_NAMESPACE, key: "status", value: "new", type: "single_line_text_field" },
@@ -274,6 +295,56 @@ export async function updateQuoteStatus(draftOrderId: string, status: QuoteStatu
             type: "single_line_text_field",
           },
         ],
+      },
+    },
+  );
+}
+
+export async function updateQuoteExpiry(draftOrderId: string, expiresAt: string): Promise<void> {
+  await adminQuery(
+    `mutation UpdateDraftOrderExpiry($id: ID!, $input: DraftOrderInput!) {
+      draftOrderUpdate(id: $id, input: $input) {
+        userErrors { message }
+      }
+    }`,
+    {
+      id: draftOrderId,
+      input: {
+        metafields: [
+          {
+            namespace: QUOTE_NAMESPACE,
+            key: "expires_at",
+            value: expiresAt,
+            type: "single_line_text_field",
+          },
+        ],
+      },
+    },
+  );
+}
+
+export async function updateQuoteLineItemPrice(
+  draftOrderId: string,
+  lineItemId: string,
+  listPrice: number,
+  newPrice: number,
+): Promise<void> {
+  const discount = Math.max(0, listPrice - newPrice);
+  await adminQuery(
+    `mutation UpdateLineItemPrice($id: ID!, $input: DraftOrderInput!) {
+      draftOrderUpdate(id: $id, input: $input) {
+        userErrors { message }
+      }
+    }`,
+    {
+      id: draftOrderId,
+      input: {
+        lineItems: [{
+          id: lineItemId,
+          appliedDiscount: discount > 0
+            ? { valueType: "FIXED_AMOUNT", value: discount, description: "Negotiated price" }
+            : null,
+        }],
       },
     },
   );
