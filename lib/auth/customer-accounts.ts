@@ -80,6 +80,22 @@ interface CustomerInfo {
   }>;
 }
 
+export async function getCustomerByEmail(email: string): Promise<CustomerInfo | null> {
+  const data = await adminQuery<{
+    customers: { edges: Array<{ node: { id: string; email: string; firstName: string; lastName: string } }> }
+  }>(
+    `query GetCustomerByEmail($q: String!) {
+      customers(first: 1, query: $q) {
+        edges { node { id email firstName lastName } }
+      }
+    }`,
+    { q: `email:${email}` }
+  );
+  const node = data.customers?.edges?.[0]?.node;
+  if (!node) return null;
+  return { ...node, companyContacts: [] };
+}
+
 export async function getCustomerWithCompany(customerId: string): Promise<CustomerInfo | null> {
   // Normalize to Admin API format: gid://shopify/Customer/{id}
   // The JWT sub uses gid://shopify/CustomerAccount/... — strip to numeric ID and rebuild.
@@ -89,6 +105,12 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
   } else {
     const numericId = customerId.split("/").pop() ?? customerId;
     gid = `gid://shopify/Customer/${numericId}`;
+  }
+
+  // Guard: if the GID has no numeric ID, fall back to email-based lookup upstream
+  const numericPart = gid.replace("gid://shopify/Customer/", "");
+  if (!numericPart || !/^\d+$/.test(numericPart)) {
+    throw new Error(`Invalid customer GID (no numeric ID): ${gid}`);
   }
 
   // Step 1: basic customer lookup (always works with read_customers scope)
@@ -156,7 +178,12 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
       }));
     }
   } catch (e) {
-    console.warn("[customer-accounts] B2B company query failed (token may lack read_companies scope):", String(e));
+    const msg = String(e);
+    if (msg.includes("doesn't exist on type") || msg.includes("undefinedField")) {
+      console.warn("[customer-accounts] B2B companyContacts field not available (store may not be on B2B plan)");
+    } else {
+      console.warn("[customer-accounts] B2B company query failed:", msg);
+    }
   }
 
   return {
