@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   const { codeVerifier, codeChallenge } = generatePKCE();
 
   const secure = process.env.NODE_ENV === "production";
-  const cookieOpts = { httpOnly: true, secure, sameSite: "lax" as const, maxAge: 300 };
+  const cookieOpts = { httpOnly: true, secure, sameSite: "lax" as const, maxAge: 300, path: "/" };
 
   const jar = await cookies();
   jar.set("oauth_state", state, cookieOpts);

@@ -11,7 +11,7 @@ const CUSTOMER_ACCOUNTS_BASE =
   process.env.SHOPIFY_CUSTOMER_ACCOUNTS_BASE_URL ??
   `https://shopify.com/authentication/${SHOP_ID}`;
 const SHOPIFY_JWKS = createRemoteJWKSet(
-  new URL(`${CUSTOMER_ACCOUNTS_BASE}/oauth/jwks`)
+  new URL(`${CUSTOMER_ACCOUNTS_BASE}/.well-known/jwks.json`)
 );
 
 export async function GET(req: Request) {
@@ -41,7 +41,10 @@ export async function GET(req: Request) {
     const { idToken } = await exchangeCodeForTokens(code, codeVerifier);
 
     // Verify the ID token signature using Shopify's JWKS (RS256)
-    const { payload } = await jwtVerify(idToken, SHOPIFY_JWKS, { algorithms: ["RS256"] });
+    const { payload } = await jwtVerify(idToken, SHOPIFY_JWKS, {
+      algorithms: ["RS256"],
+      issuer: CUSTOMER_ACCOUNTS_BASE,
+    });
     const sub = (payload.sub as string | undefined) ?? "";
     const customerId = sub.startsWith("gid://") ? sub : `gid://shopify/Customer/${sub}`;
 
