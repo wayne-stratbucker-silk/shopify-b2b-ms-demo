@@ -3,9 +3,16 @@ import { cookies } from "next/headers";
 import { exchangeCodeForTokens, getCustomerWithCompany, buildSession } from "@/lib/auth/customer-accounts";
 import { encodeSession, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "@/lib/auth/session";
 import { safeReturnUrl } from "@/lib/auth/safe-return-url";
-import { jwtVerify } from "jose";
+import { jwtVerify, createRemoteJWKSet } from "jose";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL!;
+const STORE_DOMAIN = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN!;
+const CUSTOMER_ACCOUNTS_BASE =
+  process.env.SHOPIFY_CUSTOMER_ACCOUNTS_BASE_URL ??
+  `https://shopify.com/authentication/${STORE_DOMAIN.replace(/\.myshopify\.com$/, "")}`;
+const SHOPIFY_JWKS = createRemoteJWKSet(
+  new URL(`${CUSTOMER_ACCOUNTS_BASE}/oauth/jwks`)
+);
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -31,17 +38,9 @@ export async function GET(req: Request) {
   try {
     const { idToken } = await exchangeCodeForTokens(code);
 
-    // Decode the ID token to get the customer ID
-    const decoded = await jwtVerify(idToken, async () => {
-      // Shopify signs with RS256; for now trust the payload (verify in prod with JWKS)
-      return new Uint8Array(0);
-    }).catch(() => {
-      // Fallback: parse without verification for dev
-      const payload = JSON.parse(Buffer.from(idToken.split(".")[1], "base64url").toString());
-      return { payload };
-    });
-
-    const sub = (decoded as { payload: { sub?: string } }).payload?.sub ?? "";
+    // Verify the ID token signature using Shopify's JWKS (RS256)
+    const { payload } = await jwtVerify(idToken, SHOPIFY_JWKS, { algorithms: ["RS256"] });
+    const sub = (payload.sub as string | undefined) ?? "";
     const customerId = sub.startsWith("gid://") ? sub : `gid://shopify/Customer/${sub}`;
 
     const customer = await getCustomerWithCompany(customerId);
