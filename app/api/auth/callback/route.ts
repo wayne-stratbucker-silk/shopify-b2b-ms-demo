@@ -6,10 +6,10 @@ import { safeReturnUrl } from "@/lib/auth/safe-return-url";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL!;
-const STORE_DOMAIN = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN!;
+const SHOP_ID = process.env.SHOPIFY_SHOP_ID!;
 const CUSTOMER_ACCOUNTS_BASE =
   process.env.SHOPIFY_CUSTOMER_ACCOUNTS_BASE_URL ??
-  `https://shopify.com/authentication/${STORE_DOMAIN.replace(/\.myshopify\.com$/, "")}`;
+  `https://shopify.com/authentication/${SHOP_ID}`;
 const SHOPIFY_JWKS = createRemoteJWKSet(
   new URL(`${CUSTOMER_ACCOUNTS_BASE}/oauth/jwks`)
 );
@@ -22,9 +22,10 @@ export async function GET(req: Request) {
 
   const jar = await cookies();
   const storedState = jar.get("oauth_state")?.value;
+  const codeVerifier = jar.get("oauth_code_verifier")?.value;
   const returnTo = safeReturnUrl(jar.get("oauth_return_to")?.value, "/account");
 
-  if (error || !code || !state || state !== storedState) {
+  if (error || !code || !state || state !== storedState || !codeVerifier) {
     const loginUrl = new URL("/login", APP_URL);
     loginUrl.searchParams.set("error", error ?? "auth_failed");
     return NextResponse.redirect(loginUrl);
@@ -34,9 +35,10 @@ export async function GET(req: Request) {
   jar.delete("oauth_state");
   jar.delete("oauth_nonce");
   jar.delete("oauth_return_to");
+  jar.delete("oauth_code_verifier");
 
   try {
-    const { idToken } = await exchangeCodeForTokens(code);
+    const { idToken } = await exchangeCodeForTokens(code, codeVerifier);
 
     // Verify the ID token signature using Shopify's JWKS (RS256)
     const { payload } = await jwtVerify(idToken, SHOPIFY_JWKS, { algorithms: ["RS256"] });
