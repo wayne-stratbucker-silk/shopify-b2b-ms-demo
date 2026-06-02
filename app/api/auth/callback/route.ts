@@ -6,10 +6,10 @@ import { safeReturnUrl } from "@/lib/auth/safe-return-url";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL!;
-const STORE_DOMAIN = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN!;
+const SHOP_ID = process.env.SHOPIFY_SHOP_ID!;
 const CUSTOMER_ACCOUNTS_BASE =
   process.env.SHOPIFY_CUSTOMER_ACCOUNTS_BASE_URL ??
-  `https://shopify.com/authentication/${STORE_DOMAIN.replace(/\.myshopify\.com$/, "")}`;
+  `https://shopify.com/authentication/${SHOP_ID}`;
 const SHOPIFY_JWKS = createRemoteJWKSet(
   new URL(`${CUSTOMER_ACCOUNTS_BASE}/oauth/jwks`)
 );
