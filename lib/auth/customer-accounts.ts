@@ -8,7 +8,11 @@ const CLIENT_ID = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID!;
 const CLIENT_SECRET = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_SECRET!;
 
 // Shopify Customer Accounts API OAuth2 endpoints
-const CUSTOMER_ACCOUNTS_BASE = `https://shopify.com/authentication/${STORE_DOMAIN}`;
+// SHOPIFY_CUSTOMER_ACCOUNTS_BASE_URL can be set explicitly if the store uses a
+// custom accounts URL or the default format needs overriding.
+const CUSTOMER_ACCOUNTS_BASE =
+  process.env.SHOPIFY_CUSTOMER_ACCOUNTS_BASE_URL ??
+  `https://shopify.com/authentication/${STORE_DOMAIN.replace(/\.myshopify\.com$/, "")}`;
 
 export function getLoginUrl(state: string, nonce: string): string {
   const params = new URLSearchParams({
