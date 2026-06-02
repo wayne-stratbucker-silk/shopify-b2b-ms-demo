@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { adminQuery } from "@/lib/shopify/admin-client";
+import { AddressesClient } from "./addresses-client";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +88,8 @@ export default async function AddressesPage() {
           })}
         </div>
       )}
+
+      <AddressesClient />
     </div>
   );
 }
