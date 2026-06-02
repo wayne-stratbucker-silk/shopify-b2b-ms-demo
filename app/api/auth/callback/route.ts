@@ -5,7 +5,7 @@ import { encodeSession, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "@/lib/auth/s
 import { safeReturnUrl } from "@/lib/auth/safe-return-url";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL!;
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://shopify-b2b-ms-demo.vercel.app";
 const CLIENT_ID = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID!;
 const SHOP_ID = process.env.SHOPIFY_SHOP_ID!;
 const CUSTOMER_ACCOUNTS_BASE =
@@ -15,13 +15,21 @@ const SHOPIFY_JWKS = createRemoteJWKSet(
   new URL(`${CUSTOMER_ACCOUNTS_BASE}/.well-known/jwks.json`)
 );
 
-function loginUrl(errorCode: string): URL {
-  const u = new URL("/login", APP_URL);
-  u.searchParams.set("error", errorCode);
-  return u;
+function toLoginUrl(errorCode: string): string {
+  return `${APP_URL}/login?error=${errorCode}`;
 }
 
 export async function GET(req: Request) {
+  // Top-level guard: nothing in this handler should cause a 500
+  try {
+    return await handleCallback(req);
+  } catch (err) {
+    console.error("[auth/callback] unhandled:", String(err));
+    return NextResponse.redirect(toLoginUrl("unexpected"));
+  }
+}
+
+async function handleCallback(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
@@ -34,7 +42,8 @@ export async function GET(req: Request) {
   const returnTo = safeReturnUrl(jar.get("oauth_return_to")?.value, "/account");
 
   if (error || !code || !state || state !== storedState || !codeVerifier) {
-    return NextResponse.redirect(loginUrl(error ?? "auth_failed"));
+    console.error("[auth/callback] auth_failed — error:", error, "code:", !!code, "state match:", state === storedState, "verifier:", !!codeVerifier);
+    return NextResponse.redirect(toLoginUrl(error ?? "auth_failed"));
   }
 
   // Clear all OAuth cookies before proceeding
@@ -48,48 +57,56 @@ export async function GET(req: Request) {
   try {
     tokens = await exchangeCodeForTokens(code, codeVerifier);
   } catch (e) {
-    console.error("[auth/callback] token_exchange_failed:", e);
-    return NextResponse.redirect(loginUrl("token_exchange_failed"));
+    console.error("[auth/callback] token_exchange_failed:", String(e));
+    return NextResponse.redirect(toLoginUrl("token_exchange_failed"));
+  }
+
+  // Validate we received an ID token
+  if (!tokens.idToken || typeof tokens.idToken !== "string") {
+    console.error("[auth/callback] no_id_token — token response keys:", Object.keys(tokens));
+    return NextResponse.redirect(toLoginUrl("no_id_token"));
   }
 
   // Step 2: verify ID token signature, issuer, and audience
-  let jwtPayload: Awaited<ReturnType<typeof jwtVerify>>["payload"];
+  let jwtPayload: Record<string, unknown>;
   try {
-    ({ payload: jwtPayload } = await jwtVerify(tokens.idToken, SHOPIFY_JWKS, {
+    const result = await jwtVerify(tokens.idToken, SHOPIFY_JWKS, {
       algorithms: ["RS256"],
       issuer: CUSTOMER_ACCOUNTS_BASE,
       audience: CLIENT_ID,
-    }));
+    });
+    jwtPayload = result.payload as Record<string, unknown>;
   } catch (e) {
-    console.error("[auth/callback] jwt_failed:", e);
-    return NextResponse.redirect(loginUrl("jwt_failed"));
+    console.error("[auth/callback] jwt_failed:", String(e));
+    return NextResponse.redirect(toLoginUrl("jwt_failed"));
   }
 
   // Step 3: nonce validation (replay protection)
-  if (storedNonce && jwtPayload.nonce !== storedNonce) {
+  if (storedNonce && jwtPayload["nonce"] !== storedNonce) {
     console.error("[auth/callback] nonce_mismatch");
-    return NextResponse.redirect(loginUrl("nonce_mismatch"));
+    return NextResponse.redirect(toLoginUrl("nonce_mismatch"));
   }
 
   // Step 4: look up customer + company via Admin API
-  const sub = (jwtPayload.sub as string | undefined) ?? "";
+  const sub = typeof jwtPayload["sub"] === "string" ? jwtPayload["sub"] : "";
   const customerId = sub.startsWith("gid://") ? sub : `gid://shopify/Customer/${sub}`;
+
   let customer: Awaited<ReturnType<typeof getCustomerWithCompany>>;
   try {
     customer = await getCustomerWithCompany(customerId);
   } catch (e) {
-    console.error("[auth/callback] customer_lookup_failed:", e);
-    return NextResponse.redirect(loginUrl("customer_lookup_failed"));
+    console.error("[auth/callback] customer_lookup_failed:", String(e));
+    return NextResponse.redirect(toLoginUrl("customer_lookup_failed"));
   }
   if (!customer) {
     console.error("[auth/callback] customer_not_found:", customerId);
-    return NextResponse.redirect(loginUrl("customer_not_found"));
+    return NextResponse.redirect(toLoginUrl("customer_not_found"));
   }
 
   // Build session and set cookie
   const session = buildSession(customer);
   const encoded = encodeSession(session);
-  const response = NextResponse.redirect(new URL(returnTo, APP_URL));
+  const response = NextResponse.redirect(`${APP_URL}${returnTo}`);
   response.cookies.set(SESSION_COOKIE, encoded, SESSION_COOKIE_OPTS);
   return response;
 }
