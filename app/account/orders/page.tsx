@@ -149,7 +149,7 @@ export default async function OrdersPage({ searchParams }: Props) {
               return (
                 <tr key={order.id}>
                   <td className="col-primary">
-                    <Link href={`/account/orders/${encodeURIComponent(order.id)}`} className="tbl row-link">{order.name}</Link>
+                    <Link href={`/account/orders/${order.id.split('/').pop()}`} className="tbl row-link">{order.name}</Link>
                   </td>
                   <td className="col-meta muted">{fmtDate(order.createdAt)}</td>
                   <td className="col-meta">{buyer || "—"}</td>
@@ -161,7 +161,7 @@ export default async function OrdersPage({ searchParams }: Props) {
                   </td>
                   <td className="col-value num">{fmt(amt, order.totalPriceSet.shopMoney.currencyCode)}</td>
                   <td className="col-action">
-                    <Link href={`/account/orders/${encodeURIComponent(order.id)}`} className="btn btn-ghost btn-xs">
+                    <Link href={`/account/orders/${order.id.split('/').pop()}`} className="btn btn-ghost btn-xs">
                       View
                     </Link>
                   </td>

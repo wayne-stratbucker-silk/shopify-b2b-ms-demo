@@ -129,7 +129,7 @@ export default async function AccountDashboard() {
                   orders.map((o) => (
                     <tr key={o.id}>
                       <td className="col-primary">
-                        <Link href={`/account/orders/${encodeURIComponent(o.id)}`} className="tbl row-link">{o.name}</Link>
+                        <Link href={`/account/orders/${o.id.split('/').pop()}`} className="tbl row-link">{o.name}</Link>
                       </td>
                       <td className="col-meta muted">{fmtDate(o.createdAt)}</td>
                       <td className="col-status">
