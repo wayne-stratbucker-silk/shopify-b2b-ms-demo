@@ -18,7 +18,10 @@ export async function POST(req: Request) {
   const product = await getProductBySku(sku);
   if (!product) return NextResponse.json({ error: `Product not found for SKU: ${sku}` }, { status: 404 });
 
-  const defaultVariant = product.variants.edges[0]?.node;
+  // Select the variant matching the requested SKU (products may have many).
+  const defaultVariant =
+    product.variants.edges.map((e) => e.node).find((v) => v.sku === sku) ??
+    product.variants.edges[0]?.node;
   if (!defaultVariant) return NextResponse.json({ error: "No variant found" }, { status: 404 });
 
   // Get companyContactId for purchasing entity

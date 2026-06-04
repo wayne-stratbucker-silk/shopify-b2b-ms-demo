@@ -38,7 +38,18 @@ export async function storefrontQuery<T>(
 
   const json = await res.json();
   if (json.errors?.length) {
-    throw new Error(`Storefront API errors: ${JSON.stringify(json.errors)}`);
+    // Shopify returns field-level (partial) errors alongside a valid `data`
+    // payload — e.g. `quantityAvailable` requires the
+    // `unauthenticated_read_product_inventory` scope, which not every Storefront
+    // token has. Per GraphQL semantics a partial error nulls only the affected
+    // field, so treat errors as fatal ONLY when no data came back. Otherwise log
+    // and return the partial data so the rest of the response is usable.
+    // (To get inventory via the Storefront API, grant the token the
+    //  unauthenticated_read_product_inventory access scope.)
+    if (json.data == null) {
+      throw new Error(`Storefront API errors: ${JSON.stringify(json.errors)}`);
+    }
+    console.warn(`Storefront API partial errors: ${JSON.stringify(json.errors)}`);
   }
   return json.data as T;
 }
