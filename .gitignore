@@ -36,8 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
-# claude code
-.claude/
+# claude code — ignore local state (worktrees, etc.) but TRACK shared agents
+.claude/*
+!.claude/agents/
 
 # typescript
 *.tsbuildinfo
