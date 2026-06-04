@@ -1,4 +1,4 @@
-import { validateSkus } from "@/lib/shopify/queries/products";
+import { resolveSkuVariants } from "@/lib/shopify/queries/products";
 import { NextResponse } from "next/server";
 
 const fmt = (n: number) =>
@@ -17,34 +17,25 @@ export async function GET(request: Request) {
   }
 
   try {
-    const productMap = await validateSkus(skus);
+    // Exact SKU → variant resolution via the Admin API (the Storefront API
+    // cannot filter by SKU). See resolveSkuVariants for details.
+    const variantMap = await resolveSkuVariants(skus);
 
     const products = skus.flatMap((sku) => {
-      const shopifyProduct = productMap.get(sku);
-      if (!shopifyProduct) return [];
-
-      const variant = shopifyProduct.variants.edges
-        .map((e) => e.node)
-        .find((v) => v.sku === sku);
-
-      const price = parseFloat(
-        variant?.price?.amount ??
-          shopifyProduct.variants.edges[0]?.node?.price?.amount ??
-          "0",
-      );
-      const listPrice = parseFloat(variant?.compareAtPrice?.amount ?? "0");
+      const v = variantMap.get(sku);
+      if (!v) return [];
 
       return [
         {
-          sku,
-          name: shopifyProduct.title,
-          brand: shopifyProduct.vendor || undefined,
-          price: fmt(price),
-          unitPriceRaw: price,
-          listPriceRaw: listPrice > 0 ? listPrice : undefined,
-          imageUrl: shopifyProduct.featuredImage?.url,
-          path: `/${shopifyProduct.handle}`,
-          // No `variants` field → treated as a finished SKU by all consumers
+          sku: v.sku,
+          name: v.title,
+          brand: v.vendor,
+          price: fmt(v.price),
+          unitPriceRaw: v.price,
+          listPriceRaw: v.compareAtPrice,
+          stock: v.inventoryQuantity,
+          imageUrl: v.imageUrl,
+          path: `/products/${v.handle}`,
         },
       ];
     });

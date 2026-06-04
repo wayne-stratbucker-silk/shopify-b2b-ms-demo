@@ -141,6 +141,7 @@ export interface Order {
 
 // ─── Quote (backed by Shopify Draft Order) ───
 export type QuoteStatus =
+  | "draft"
   | "new"
   | "in_process"
   | "updated_by_buyer"

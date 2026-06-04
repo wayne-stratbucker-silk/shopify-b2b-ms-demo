@@ -4,6 +4,7 @@ import { client } from "@/lib/makeswift/client";
 import { Header, type HeaderAccountInfo } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { ToastProvider } from "@/components/ui/toast";
+import { QuoteCartFab } from "@/components/quote-cart-fab";
 import { getSession } from "@/lib/auth/session";
 import "@/components/makeswift/register";
 
@@ -40,6 +41,7 @@ export default async function StorefrontLayout({ children }: { children: React.R
       {headerNavSlot}
       <main id="main-content">{children}</main>
       <Footer navSlot={footerNavSlot} />
+      <QuoteCartFab />
     </ToastProvider>
   );
 }

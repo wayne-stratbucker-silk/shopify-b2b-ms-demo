@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { getQuote } from "@/lib/quotes/client";
-import { setQuoteCart } from "@/lib/quotes/quote-cart";
+import { getQuote, createCartDraftOrder } from "@/lib/quotes/client";
+import { setQuoteCartDraftOrderId } from "@/lib/quotes/quote-cart";
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -12,23 +12,23 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const quote = await getQuote(draftOrderId).catch(() => null);
   if (!quote) return NextResponse.json({ error: "Quote not found" }, { status: 404 });
 
-  const items = (quote.quoteItems ?? [])
-    .filter((item) => item.variantId && item.productId)
+  const lineItems = (quote.quoteItems ?? [])
+    .filter((item) => item.variantId)
     .map((item) => ({
-      sku: item.sku,
-      name: item.name,
-      quantity: item.qty,
-      price: item.listPrice,
       variantId: item.variantId!,
-      productId: item.productId!,
-      handle: item.productHandle ?? item.sku,
-      imageUrl: item.imageUrl,
+      quantity: item.qty,
+      originalUnitPrice: String(item.listPrice),
+      title: item.name,
     }));
 
-  if (items.length === 0) {
+  if (lineItems.length === 0) {
     return NextResponse.json({ error: "No duplicable items found" }, { status: 400 });
   }
 
-  await setQuoteCart(items);
-  return NextResponse.json({ ok: true, count: items.length });
+  const cart = await createCartDraftOrder(session.customerId, lineItems, {
+    companyId: session.companyId,
+    companyLocationId: session.companyLocationId,
+  });
+  await setQuoteCartDraftOrderId(cart.id);
+  return NextResponse.json({ ok: true, count: lineItems.length });
 }

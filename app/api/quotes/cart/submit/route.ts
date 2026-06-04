@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { getQuoteCart, clearQuoteCart } from "@/lib/quotes/quote-cart";
-import { createQuote, updateQuoteStatus } from "@/lib/quotes/client";
-import { adminQuery } from "@/lib/shopify/admin-client";
+import { getQuoteCartDraftOrderId, clearQuoteCart } from "@/lib/quotes/quote-cart";
+import { getQuote, submitCartAsQuote, updateQuoteStatus } from "@/lib/quotes/client";
 import type { MailingAddressInput } from "@/lib/quotes/client";
-import type { QuoteCartLineItem } from "@/types/line-item";
 
 interface ComponentAddress {
   firstName?: string;
@@ -39,66 +37,24 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Read metadata from the request body (sent by QuoteCartReview)
   const body = await req.json().catch(() => ({})) as {
-    items?: QuoteCartLineItem[];
     quoteTitle?: string;
     notes?: string;
     referenceNumber?: string;
-    phoneNumber?: string;
     shippingAddress?: ComponentAddress;
     billingAddress?: ComponentAddress;
     sourceQuoteId?: string;
   };
 
-  // Items: prefer the body (respects in-browser qty edits) with cookie as fallback
-  const bodyItems = body.items && body.items.length > 0 ? body.items : null;
-  const cookieItems = await getQuoteCart();
-  const rawItems = bodyItems ?? cookieItems.map((i) => ({
-    sku: i.sku,
-    name: i.name,
-    quantity: i.quantity,
-    unitPrice: i.price,
-    variantId: undefined as number | undefined,
-    productId: undefined as number | undefined,
-    imageUrl: i.imageUrl,
-  }));
+  const draftOrderId = await getQuoteCartDraftOrderId();
+  if (!draftOrderId) return NextResponse.json({ error: "Quote cart is empty" }, { status: 400 });
 
-  if (!rawItems || rawItems.length === 0) {
-    return NextResponse.json({ error: "Quote cart is empty" }, { status: 400 });
-  }
-
-  // Rebuild line items with GIDs from cookie (cookie has the authoritative GIDs)
-  const cookieMap = new Map(cookieItems.map((i) => [i.sku, i]));
-  const lineItems = rawItems.map((item) => {
-    const cookie = cookieMap.get(item.sku);
-    return {
-      variantId: cookie?.variantId ?? `gid://shopify/ProductVariant/${item.variantId ?? 0}`,
-      quantity: item.quantity,
-      originalUnitPrice: String(item.unitPrice),
-      title: item.name,
-    };
-  }).filter((i) => i.variantId && !i.variantId.endsWith("/0"));
-
-  if (lineItems.length === 0) {
-    return NextResponse.json({ error: "No valid line items" }, { status: 400 });
-  }
-
-  let companyContactId: string | undefined;
-  if (session.customerId) {
-    const data = await adminQuery<{ customer: { companyContacts: { edges: Array<{ node: { id: string } }> } } | null }>(
-      `query { customer(id: "${session.customerId}") { companyContacts(first:1) { edges { node { id } } } } }`
-    ).catch(() => ({ customer: null }));
-    companyContactId = data.customer?.companyContacts?.edges?.[0]?.node.id;
-  }
+  const quote = await getQuote(draftOrderId).catch(() => null);
+  if (!quote) return NextResponse.json({ error: "Quote cart not found" }, { status: 400 });
+  if (quote.status !== "draft") return NextResponse.json({ error: "Cart has already been submitted" }, { status: 400 });
 
   try {
-    const quote = await createQuote({
-      lineItems,
-      customerId: session.customerId,
-      companyId: session.companyId,
-      companyLocationId: session.companyLocationId,
-      companyContactId,
+    await submitCartAsQuote(draftOrderId, {
       title: body.quoteTitle,
       referenceNumber: body.referenceNumber,
       notes: body.notes,
@@ -112,9 +68,9 @@ export async function POST(req: Request) {
     }
 
     await clearQuoteCart();
-    return NextResponse.json({ quoteId: quote.id, quoteName: quote.name });
+    return NextResponse.json({ quoteId: draftOrderId, quoteName: quote.draftOrderName });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to create quote";
+    const message = err instanceof Error ? err.message : "Failed to submit quote";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
