@@ -9,6 +9,8 @@ import { QuoteLineItems } from "@/components/quote-line-items";
 import { AcceptButton } from "@/components/accept-button";
 import { AdminCompleteButton } from "@/components/admin-complete-button";
 import { RejectButton } from "@/components/reject-button";
+import { QuoteActionButton } from "@/components/quote-action-button";
+import { QuoteExpiryEditor } from "@/components/quote-expiry-editor";
 import type { QuoteStatus } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -132,12 +134,15 @@ export default async function QuoteDetailPage({ params }: Props) {
               <AcceptButton quoteId={encodeURIComponent(quote.id)} />
             )}
             {canApprove && (
-              <form action={`/api/quotes/${encodeURIComponent(quote.id)}`} method="POST" style={{ marginTop: 8 }}>
-                <input type="hidden" name="action" value="approve" />
-                <button type="submit" className="btn btn-block" style={{ borderColor: "var(--success)", color: "var(--success)" }}>
-                  Approve Quote
-                </button>
-              </form>
+              <div style={{ marginTop: 8 }}>
+                <QuoteActionButton
+                  quoteId={encodeURIComponent(quote.id)}
+                  action="approve"
+                  label="Approve Quote"
+                  pendingLabel="Approving…"
+                  style={{ borderColor: "var(--success)", color: "var(--success)" }}
+                />
+              </div>
             )}
             {canComplete && (
               <div style={{ marginTop: 8 }}>
@@ -150,12 +155,15 @@ export default async function QuoteDetailPage({ params }: Props) {
               </div>
             )}
             {canSendEmail && (
-              <form action={`/api/quotes/${encodeURIComponent(quote.id)}`} method="POST" style={{ marginTop: 8 }}>
-                <input type="hidden" name="action" value="email" />
-                <button type="submit" className="btn btn-ghost btn-block">
-                  Send Invoice Email
-                </button>
-              </form>
+              <div style={{ marginTop: 8 }}>
+                <QuoteActionButton
+                  quoteId={encodeURIComponent(quote.id)}
+                  action="email"
+                  label="Send Invoice Email"
+                  pendingLabel="Sending…"
+                  className="btn btn-ghost btn-block"
+                />
+              </div>
             )}
             {quote.status === "in_process" && !canAccept && !canSendEmail && (
               <p className="text-sm" style={{ color: "var(--muted)" }}>Contact your admin to approve this quote.</p>
@@ -174,6 +182,14 @@ export default async function QuoteDetailPage({ params }: Props) {
               <div className="text-xs" style={{ color: "var(--muted)", marginBottom: 4 }}>Reference</div>
               <div className="text-mono">{quote.referenceNumber}</div>
             </div>
+          )}
+
+          {/* Admins can set/extend the expiry date that drives "expiring soon" alerts. */}
+          {isAdmin && quote.status !== "ordered" && quote.status !== "archived" && (
+            <QuoteExpiryEditor
+              quoteId={encodeURIComponent(quote.id)}
+              currentExpiry={quote.expires}
+            />
           )}
 
           <QuoteActions

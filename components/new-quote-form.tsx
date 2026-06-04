@@ -38,18 +38,18 @@ export function NewQuoteForm({ sku, initialQty, productName, unitPrice }: NewQuo
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sku,
-          qty,
-          quoteTitle: title || undefined,
+          quantity: qty,
+          title: title || undefined,
           notes: notes || undefined,
           referenceNumber: refNumber || undefined,
         }),
       });
-      const data = await res.json() as { quoteId?: number; error?: string };
-      if (!res.ok) {
+      const data = await res.json() as { quoteId?: string; error?: string };
+      if (!res.ok || !data.quoteId) {
         setError(data.error ?? "Could not create quote — please try again");
         return;
       }
-      router.push(`/account/quotes/${data.quoteId}`);
+      router.push(`/account/quotes/${encodeURIComponent(data.quoteId)}`);
     } catch {
       setError("Network error — please try again");
     } finally {

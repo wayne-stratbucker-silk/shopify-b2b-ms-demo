@@ -127,9 +127,22 @@ export function QuoteCartReview() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Persist an absolute quantity to the Shopify draft order so the change
+  // survives submit and stays in sync with the floating quote-cart FAB.
+  function persistQty(sku: string, quantity: number) {
+    fetch("/api/quotes/cart/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sku, quantity }),
+    })
+      .then(() => window.dispatchEvent(new Event("quoteCartUpdate")))
+      .catch(() => {});
+  }
+
   function setQty(sku: string, newQty: number) {
     if (newQty < 1) return;
     setItems((prev) => prev.map((item) => (item.sku === sku ? { ...item, quantity: newQty } : item)));
+    persistQty(sku, newQty);
   }
 
   function handleQtyInput(sku: string, raw: string) {
@@ -195,13 +208,13 @@ export function QuoteCartReview() {
           billingAddress,
         }),
       });
-      const data = await res.json() as { quoteId?: number; error?: string };
+      const data = await res.json() as { quoteId?: string; error?: string };
       if (!res.ok || !data.quoteId) {
         setSubmitError(data.error ?? "Failed to submit quote");
         return;
       }
       window.dispatchEvent(new Event("quoteCartUpdate"));
-      router.push(`/account/quotes/${data.quoteId}`);
+      router.push(`/account/quotes/${encodeURIComponent(data.quoteId)}`);
     } catch {
       setSubmitError("Network error — please try again");
     } finally {

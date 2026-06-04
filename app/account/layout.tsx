@@ -6,6 +6,7 @@ import { Header, type HeaderAccountInfo } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { AccountNav } from "@/components/account-nav";
 import { ToastProvider } from "@/components/ui/toast";
+import { QuoteCartFab } from "@/components/quote-cart-fab";
 import { getSession } from "@/lib/auth/session";
 import { SessionRefresher } from "./session-refresher";
 import "@/components/makeswift/header-nav";
@@ -47,6 +48,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
         </div>
       </div>
       <Footer navSlot={footerSnap && <MakeswiftComponent snapshot={footerSnap} label="Footer Navigation" type="acme/footer-nav" />} />
+      <QuoteCartFab />
     </ToastProvider>
   );
 }
