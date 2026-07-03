@@ -1,6 +1,7 @@
 "use client";
 
 import { Icon } from "@/components/ui/icons";
+import { brand } from "@/lib/brand/config";
 
 export interface InvoiceData {
   orderId: number;
@@ -72,8 +73,8 @@ function invoiceHtml(d: InvoiceData): string {
   </style></head><body>
   <div class="head">
     <div>
-      <div class="brand"><span class="mark">A</span> ACME</div>
-      <div class="meta" style="margin-top:8px;color:#555">ACME Industrial Supply Co.<br>Commercial Electrical &amp; Lighting</div>
+      <div class="brand"><span class="mark">${esc(brand.name.charAt(0))}</span> ${esc(brand.name)}</div>
+      <div class="meta" style="margin-top:8px;color:#555">${esc(brand.legalName)}<br>${esc(brand.tagline)}</div>
     </div>
     <div class="doc">
       <h1>INVOICE</h1>
@@ -102,7 +103,7 @@ function invoiceHtml(d: InvoiceData): string {
     <div class="row"><span>Tax</span><span>${usd(d.tax)}</span></div>
     <div class="row grand"><span>Total</span><span>${usd(d.total)}</span></div>
   </div>
-  <div class="foot">Thank you for your business. Questions? Contact your account rep or accounts-receivable@acmecorp.com.</div>
+  <div class="foot">Thank you for your business. Questions? Contact your account rep or ${esc(brand.arEmail)}.</div>
   </body></html>`;
 }
 
