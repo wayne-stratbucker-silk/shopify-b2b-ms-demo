@@ -31,6 +31,8 @@ const CART_FIELDS = `
     totalAmount { amount currencyCode }
     totalTaxAmount { amount currencyCode }
   }
+  discountCodes { code applicable }
+  discountAllocations { discountedAmount { amount currencyCode } }
   buyerIdentity {
     email
     companyLocation { id name }
@@ -101,6 +103,24 @@ export async function cartLinesUpdate(cartId: string, lines: Array<{ id: string;
     { cartId, lines },
   );
   return data.cartLinesUpdate.cart;
+}
+
+export async function cartDiscountCodesUpdate(cartId: string, codes: string[]) {
+  const data = await storefrontQuery<{
+    cartDiscountCodesUpdate: {
+      cart: { discountCodes: Array<{ code: string; applicable: boolean }> } | null;
+      userErrors: Array<{ field: string[]; message: string }>;
+    };
+  }>(
+    `mutation CartDiscountCodesUpdate($cartId: ID!, $codes: [String!]!) {
+      cartDiscountCodesUpdate(cartId: $cartId, discountCodes: $codes) {
+        cart { ${CART_FIELDS} }
+        userErrors { field message }
+      }
+    }`,
+    { cartId, codes },
+  );
+  return data.cartDiscountCodesUpdate;
 }
 
 export async function cartBuyerIdentityUpdate(cartId: string, buyerIdentity: { email?: string; companyLocationId?: string }) {
