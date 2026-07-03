@@ -5,6 +5,7 @@ import { client } from "@/lib/makeswift/client";
 import { Header, type HeaderAccountInfo } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { AccountNav } from "@/components/account-nav";
+import { CreditHoldBanner } from "@/components/credit-hold-banner";
 import { ToastProvider } from "@/components/ui/toast";
 import { QuoteCartFab } from "@/components/quote-cart-fab";
 import { getSession } from "@/lib/auth/session";
@@ -42,6 +43,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
       <Header accountInfo={accountInfo} />
       {headerSnap && <MakeswiftComponent snapshot={headerSnap} label="Header Navigation" type="acme/header-nav" />}
       <div className="container">
+        <CreditHoldBanner />
         <div className="account-shell">
           <AccountNav />
           <main id="main-content">{children}</main>
