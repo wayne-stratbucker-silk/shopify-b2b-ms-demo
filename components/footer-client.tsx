@@ -3,12 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useLocation } from "./location-provider";
+import { useI18n } from "@/components/i18n/locale-provider";
+import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 
 export function FooterNewsletter() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { t } = useI18n();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,12 +42,12 @@ export function FooterNewsletter() {
       {submitted ? (
         <div style={{ gridColumn: "1 / -1", display: "inline-flex", alignItems: "center", gap: 8, height: 38, padding: "0 14px", background: "var(--primary-fade)", color: "var(--primary)", borderRadius: "var(--radius)", fontSize: 13 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--success)", flexShrink: 0 }} />
-          Thanks — confirmation sent to <b style={{ color: "var(--ink)" }}>{email}</b>.
+          {t("footer.thanks")} <b style={{ color: "var(--ink)" }}>{email}</b>.
         </div>
       ) : (
         <>
           <label style={{ display: "flex", alignItems: "stretch", background: "var(--bg)", border: "1px solid var(--line-2)", borderRadius: "var(--radius)", height: 38 }}>
-            <span className="sr-only">Work email</span>
+            <span className="sr-only">{t("footer.workEmail")}</span>
             <input
               type="email"
               required
@@ -56,7 +59,7 @@ export function FooterNewsletter() {
             />
           </label>
           <button type="submit" className="btn" disabled={loading}>
-            {loading ? "Subscribing…" : "Subscribe"}
+            {loading ? t("footer.subscribing") : t("footer.subscribe")}
           </button>
         </>
       )}
@@ -66,6 +69,9 @@ export function FooterNewsletter() {
       <p style={{ gridColumn: "1 / -1", fontFamily: "var(--font-geist-mono)", fontSize: 11, color: "var(--muted)", margin: "4px 0 0" }}>
         By subscribing you agree to ACME&apos;s <Link href="/privacy" style={{ color: "var(--muted)", textDecoration: "underline" }}>privacy policy</Link>. Unsubscribe anytime.
       </p>
+      <div style={{ gridColumn: "1 / -1", marginTop: 12 }}>
+        <LocaleSwitcher />
+      </div>
     </form>
   );
 }
