@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { CartActions } from "./cart-actions";
 import { ExpressCheckout } from "@/components/express-checkout";
+import { DiscountCode } from "@/components/cart/discount-code";
 import { getSession } from "@/lib/auth/session";
 import { checkExpressEligibility } from "@/lib/checkout/express";
 
@@ -30,6 +31,8 @@ export default async function CartPage() {
     totalQuantity: number;
     lines: { edges: Array<{ node: { id: string; quantity: number; merchandise: { id: string; sku: string; title: string; product: { title: string; handle: string; featuredImage?: { url: string; altText?: string } }; price: { amount: string; currencyCode: string } }; cost: { totalAmount: { amount: string; currencyCode: string } } } }> };
     cost: { subtotalAmount: { amount: string; currencyCode: string }; totalAmount: { amount: string; currencyCode: string } };
+    discountCodes?: Array<{ code: string; applicable: boolean }>;
+    discountAllocations?: Array<{ discountedAmount: { amount: string; currencyCode: string } }>;
   } | null;
 
   if (!cart || cart.totalQuantity === 0) {
@@ -43,6 +46,9 @@ export default async function CartPage() {
 
   const subtotal = parseFloat(cart.cost.subtotalAmount.amount);
   const currency = cart.cost.subtotalAmount.currencyCode;
+  const appliedCode = cart.discountCodes?.find((d) => d.applicable)?.code;
+  const savings = (cart.discountAllocations ?? []).reduce((s, d) => s + parseFloat(d.discountedAmount.amount), 0);
+  const money = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency }).format(n);
 
   // B2B buyers on payment terms can place the order on account (express checkout)
   // instead of the hosted card checkout. Structural eligibility only — the
@@ -85,7 +91,14 @@ export default async function CartPage() {
             <span style={{ color: "var(--muted)" }}>Subtotal</span>
             <span style={{ fontWeight: 600 }}>{new Intl.NumberFormat("en-US", { style: "currency", currency }).format(subtotal)}</span>
           </div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 20 }}>Shipping &amp; taxes calculated at checkout</div>
+          {savings > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, color: "var(--success, #16a34a)" }}>
+              <span>Discount{appliedCode ? ` (${appliedCode})` : ""}</span>
+              <span style={{ fontWeight: 600 }}>−{money(savings)}</span>
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>Shipping &amp; taxes calculated at checkout</div>
+          <DiscountCode appliedCode={appliedCode} />
           <CartActions
             checkoutUrl={cart.checkoutUrl}
             lines={cart.lines.edges.map(({ node }) => node)}
