@@ -6,6 +6,7 @@ import type { Product } from "@/types";
 import { Badge } from "./ui/badge";
 import { ProductPH, toneFromString } from "./ui/product-placeholder";
 import { StockPill } from "./ui/stock-pill";
+import { CompareToggle } from "./compare/compare-toggle";
 import { trackSelectItem, toGa4Item } from "@/lib/analytics";
 
 interface ProductCardProps {
@@ -94,6 +95,9 @@ export function ProductCard({ product: p, listName, index }: ProductCardProps) {
           <span className="list-price" style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-geist-mono, monospace)" }}>
             List ${p.listPrice.toFixed(2)}
           </span>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <CompareToggle item={{ handle: p.handle, name: p.name, image: p.images?.[0], price: p.price, brand: p.brand }} />
           </div>
         </div>
       </div>

@@ -5,6 +5,8 @@ import { Header, type HeaderAccountInfo } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { ToastProvider } from "@/components/ui/toast";
 import { QuoteCartFab } from "@/components/quote-cart-fab";
+import { CompareProvider } from "@/components/compare/compare-provider";
+import { CompareBar } from "@/components/compare/compare-bar";
 import { getSession } from "@/lib/auth/session";
 import "@/components/makeswift/register";
 
@@ -37,11 +39,14 @@ export default async function StorefrontLayout({ children }: { children: React.R
 
   return (
     <ToastProvider>
-      <Header accountInfo={accountInfo} />
-      {headerNavSlot}
-      <main id="main-content">{children}</main>
-      <Footer navSlot={footerNavSlot} />
-      <QuoteCartFab />
+      <CompareProvider>
+        <Header accountInfo={accountInfo} />
+        {headerNavSlot}
+        <main id="main-content">{children}</main>
+        <Footer navSlot={footerNavSlot} />
+        <QuoteCartFab />
+        <CompareBar />
+      </CompareProvider>
     </ToastProvider>
   );
 }
