@@ -7,6 +7,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { QuoteCartFab } from "@/components/quote-cart-fab";
 import { CompareProvider } from "@/components/compare/compare-provider";
 import { CompareBar } from "@/components/compare/compare-bar";
+import { StaffMasqueradeBanner } from "@/components/staff/masquerade-banner";
 import { LocaleProvider } from "@/components/i18n/locale-provider";
 import { getSession } from "@/lib/auth/session";
 import { cookies } from "next/headers";
@@ -47,6 +48,7 @@ export default async function StorefrontLayout({ children }: { children: React.R
     <LocaleProvider initialLocale={initialLocale}>
       <ToastProvider>
         <CompareProvider>
+          <StaffMasqueradeBanner />
           <Header accountInfo={accountInfo} />
           {headerNavSlot}
           <main id="main-content">{children}</main>

@@ -7,6 +7,7 @@ import { Footer } from "@/components/footer";
 import { AccountNav } from "@/components/account-nav";
 import { CreditHoldBanner } from "@/components/credit-hold-banner";
 import { AccountAlertsBell } from "@/components/account/alerts-bell";
+import { StaffMasqueradeBanner } from "@/components/staff/masquerade-banner";
 import { ToastProvider } from "@/components/ui/toast";
 import { QuoteCartFab } from "@/components/quote-cart-fab";
 import { getSession } from "@/lib/auth/session";
@@ -40,6 +41,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
 
   return (
     <ToastProvider>
+      <StaffMasqueradeBanner />
       <SessionRefresher needsRefresh={needsRefresh} />
       <Header accountInfo={accountInfo} />
       {headerSnap && <MakeswiftComponent snapshot={headerSnap} label="Header Navigation" type="acme/header-nav" />}
