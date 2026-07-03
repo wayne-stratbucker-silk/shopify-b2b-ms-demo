@@ -12,10 +12,18 @@ import { PdpContactCard } from "@/components/pdp-contact-card";
 // BC types stubbed out for Shopify compatibility
 type BCMgmtVariant = { id: number; sku: string; price?: number; inventory_level?: number; upc?: string; mpn?: string; option_values: Array<{ option_id: number; id: number; option_display_name: string; label: string }> };
 type ProductOptionConfig = { displayName: string; optionId: number; displayStyle?: string; values: Array<{ label: string; isDefault: boolean; id: number }> };
-async function fetchRelatedProducts(_p: unknown, _s: unknown): Promise<unknown[]> { return []; }
+// Related products via Algolia — products in the same category, excluding the
+// one being viewed. Replaces the BigCommerce related-products path.
+async function fetchRelatedProducts(currentHandle: string, catSlug: string): Promise<Product[]> {
+  if (!catSlug) return [];
+  const seed = await fetchCollectionPLP(catSlug).catch(() => null);
+  if (!seed) return [];
+  return seed.products.filter((p) => p.handle && p.handle !== currentHandle).slice(0, 4);
+}
 async function fetchProductReviewCount(_id: string): Promise<number> { return 0; }
 import { getSession } from "@/lib/auth/session";
 import { getSalesRep } from "@/lib/b2b/sales-rep";
+import { fetchCollectionPLP } from "@/lib/algolia/collection-products";
 import { client } from "@/lib/makeswift/client";
 import type { Product } from "@/types";
 
@@ -130,7 +138,7 @@ export async function PDPPage({ result }: { result: PDPResult }) {
     .replace(/\s+/g, "-");
 
   const [related, reviewCount] = await Promise.all([
-    fetchRelatedProducts(rawId, catSlug),
+    fetchRelatedProducts(product.handle, catSlug),
     fetchProductReviewCount(String(rawId)),
   ]);
 
