@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { adminQuery } from "@/lib/shopify/admin-client";
+import { enforceRateLimit } from "@/lib/security/rate-limit";
 import {
   fetchInvoiceOrder,
   invoiceBelongsToSession,
@@ -19,6 +20,9 @@ export const dynamic = "force-dynamic";
  * grant and an IDOR check (the order must belong to the caller's company).
  */
 export async function POST(req: Request) {
+  const limited = enforceRateLimit(req, "invoice-pay", 20, 60_000);
+  if (limited) return limited;
+
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!hasPermission(session.permissions, "company.invoices.pay")) {

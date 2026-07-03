@@ -3,12 +3,16 @@ import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { placeExpress } from "@/lib/checkout/express";
+import { enforceRateLimit } from "@/lib/security/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 const CART_COOKIE = "shopify_cart_id";
 
 export async function POST(req: Request) {
+  const limited = enforceRateLimit(req, "express-place", 10, 60_000);
+  if (limited) return limited;
+
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!hasPermission(session.permissions, "company.orders.create")) {
