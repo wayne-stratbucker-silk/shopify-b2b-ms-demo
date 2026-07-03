@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { adminQuery } from "@/lib/shopify/admin-client";
 import { DownloadInvoiceButton, type InvoiceData } from "@/components/account/download-invoice-button";
+import { UrgencyPill } from "@/components/account/urgency-pill";
 
 export const dynamic = "force-dynamic";
 
@@ -185,8 +186,13 @@ export default async function InvoicesPage() {
                       <Link href={invoiceHref} className="row-link" style={{ color: "var(--primary)" }}>{order.name}</Link>
                     </td>
                     <td className="text-sm">{fmtDate(order.createdAt)}</td>
-                    <td className="text-sm" style={{ color: isOverdue ? "var(--danger)" : "inherit" }}>
-                      {dueAt ? fmtDate(dueAt) : "—"}
+                    <td className="text-sm">
+                      {dueAt ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}>
+                          <span>{fmtDate(dueAt)}</span>
+                          <UrgencyPill dueDate={dueAt} settled={order.displayFinancialStatus === "PAID"} />
+                        </div>
+                      ) : "—"}
                     </td>
                     <td>
                       <span className={`status ${order.displayFinancialStatus === "PAID" ? "ok" : isOverdue ? "err" : "info"}`}>

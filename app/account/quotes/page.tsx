@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { getQuotesForCompany, getQuotesForCustomer } from "@/lib/quotes/client";
 import { getQuoteCartDraftOrderId } from "@/lib/quotes/quote-cart";
 import { Icon } from "@/components/ui/icons";
+import { UrgencyPill } from "@/components/account/urgency-pill";
 import type { Quote, QuoteStatus } from "@/types";
 
 
@@ -71,6 +72,11 @@ export default async function QuotesPage({ searchParams }: Props) {
     (q) => q.expires && q.status === "in_process" && isExpiringSoon(q.expires),
   );
 
+  // KPI summary (mirrors the invoices page tiles).
+  const activeQuotes = quotes.filter((q) => !["ordered", "expired", "archived"].includes(q.status));
+  const openValue = activeQuotes.reduce((s, q) => s + (q.total > 0 ? q.total : 0), 0);
+  const readyCount = quotes.filter((q) => q.status === "in_process").length;
+
   return (
     <div>
       {soonExpiring.length > 0 && (
@@ -126,6 +132,26 @@ export default async function QuotesPage({ searchParams }: Props) {
         </div>
       )}
 
+      {quotes.length > 0 && (
+        <div className="g3" style={{ marginBottom: 24 }}>
+          <div className="kpi">
+            <div className="lbl">Open Quotes</div>
+            <div className="val">{activeQuotes.length}</div>
+            <div className="delta">{openValue > 0 ? `${fmt(openValue)} in play` : "—"}</div>
+          </div>
+          <div className="kpi">
+            <div className="lbl">Awaiting Review</div>
+            <div className="val" style={{ color: pendingCount > 0 ? "var(--warn, #d97706)" : "inherit" }}>{pendingCount}</div>
+            <div className="delta">{pendingCount > 0 ? "Pending sales review" : "All reviewed"}</div>
+          </div>
+          <div className="kpi">
+            <div className="lbl">Ready to Order</div>
+            <div className="val" style={{ color: readyCount > 0 ? "var(--success, #16a34a)" : "inherit" }}>{readyCount}</div>
+            <div className="delta">{soonExpiring.length > 0 ? `${soonExpiring.length} expiring soon` : "Priced & ready"}</div>
+          </div>
+        </div>
+      )}
+
       {quotes.length === 0 ? (
         <div className="card" style={{ padding: "40px 16px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
           No quotes yet.{" "}
@@ -156,12 +182,13 @@ export default async function QuotesPage({ searchParams }: Props) {
                 <td className="col-hide muted" style={{ fontSize: 12 }}>{q.title || "—"}</td>
                 <td className="col-status">
                   <span className={`status status-${STATUS_CLS[q.status]}`}>{STATUS_LABELS[q.status]}</span>
-                  {q.expires && isExpiringSoon(q.expires) && (
-                    <span className="status status-warn" style={{ marginLeft: 6, fontSize: 10 }}>Expires soon</span>
-                  )}
                 </td>
                 <td className="col-value num">{q.total > 0 ? fmt(q.total) : "—"}</td>
-                <td className="col-meta muted">{q.expires ? fmtDate(q.expires) : "—"}</td>
+                <td className="col-meta muted">
+                  {q.expires && q.status === "in_process"
+                    ? <UrgencyPill dueDate={q.expires} />
+                    : q.expires ? fmtDate(q.expires) : "—"}
+                </td>
                 <td className="col-action">
                   <Link href={`/account/quotes/${encodeURIComponent(q.id)}`} className="btn btn-ghost btn-xs">
                     View
