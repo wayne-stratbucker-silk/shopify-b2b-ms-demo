@@ -6,6 +6,7 @@ export type Permission =
   | "company.quotes.view_own"
   | "company.quotes.approve"
   | "company.invoices.view"
+  | "company.invoices.pay"
   | "company.users.manage"
   | "company.lists.view_all"
   | "company.lists.view_own"
@@ -25,6 +26,7 @@ const ADMIN_PERMISSIONS: Permission[] = [
   "company.quotes.view_all",
   "company.quotes.approve",
   "company.invoices.view",
+  "company.invoices.pay",
   "company.users.manage",
   "company.lists.view_all",
   "company.addresses.manage",
