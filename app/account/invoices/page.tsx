@@ -5,6 +5,16 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { adminQuery } from "@/lib/shopify/admin-client";
 import { DownloadInvoiceButton, type InvoiceData } from "@/components/account/download-invoice-button";
 import { UrgencyPill } from "@/components/account/urgency-pill";
+import { SortableTable, type SortColumn, type SortRow } from "@/components/account/sortable-table";
+
+const INVOICE_COLUMNS: SortColumn[] = [
+  { header: "Order #", sortable: true },
+  { header: "Date", sortable: true },
+  { header: "Due Date", sortable: true },
+  { header: "Status", sortable: true },
+  { header: "Amount", align: "num", sortable: true },
+  { header: "" },
+];
 
 export const dynamic = "force-dynamic";
 
@@ -167,45 +177,41 @@ export default async function InvoicesPage() {
         </div>
       ) : (
         <div className="card" style={{ overflow: "auto" }}>
-          <table className="tbl" style={{ width: "100%" }}>
-            <thead><tr><th>Order #</th><th>Date</th><th>Due Date</th><th>Status</th><th>Amount</th><th style={{ width: 160 }} /></tr></thead>
-            <tbody>
-              {orders.map(order => {
-                const schedule = order.paymentTerms?.paymentSchedules?.edges?.[0]?.node;
-                const dueAt = schedule?.dueAt;
-                const isOverdue = dueAt && new Date(dueAt) < now && order.displayFinancialStatus !== "PAID";
-                const overdueDays = isOverdue
-                  ? Math.floor((now.getTime() - new Date(dueAt!).getTime()) / 86_400_000)
-                  : 0;
-                const amt = parseFloat(order.totalPriceSet.shopMoney.amount);
-                const invoiceData = buildInvoiceData(order, session.companyName ?? "");
-                const invoiceHref = `/account/invoices/${order.id.split("/").pop()}`;
-                return (
-                  <tr key={order.id}>
-                    <td style={{ fontWeight: 600 }}>
-                      <Link href={invoiceHref} className="row-link" style={{ color: "var(--primary)" }}>{order.name}</Link>
-                    </td>
-                    <td className="text-sm">{fmtDate(order.createdAt)}</td>
-                    <td className="text-sm">
-                      {dueAt ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}>
-                          <span>{fmtDate(dueAt)}</span>
-                          <UrgencyPill dueDate={dueAt} settled={order.displayFinancialStatus === "PAID"} />
-                        </div>
-                      ) : "—"}
-                    </td>
-                    <td>
+          <SortableTable
+            initialSort={{ index: 1, dir: "desc" }}
+            columns={INVOICE_COLUMNS}
+            rows={orders.map((order): SortRow => {
+              const schedule = order.paymentTerms?.paymentSchedules?.edges?.[0]?.node;
+              const dueAt = schedule?.dueAt;
+              const isOverdue = dueAt && new Date(dueAt) < now && order.displayFinancialStatus !== "PAID";
+              const overdueDays = isOverdue
+                ? Math.floor((now.getTime() - new Date(dueAt!).getTime()) / 86_400_000)
+                : 0;
+              const amt = parseFloat(order.totalPriceSet.shopMoney.amount);
+              const invoiceData = buildInvoiceData(order, session.companyName ?? "");
+              const invoiceHref = `/account/invoices/${order.id.split("/").pop()}`;
+              return {
+                key: order.id,
+                cells: [
+                  { className: "", sortValue: order.name, content: <span style={{ fontWeight: 600 }}><Link href={invoiceHref} className="row-link" style={{ color: "var(--primary)" }}>{order.name}</Link></span> },
+                  { className: "text-sm", sortValue: new Date(order.createdAt).getTime(), content: fmtDate(order.createdAt) },
+                  { className: "text-sm", sortValue: dueAt ? new Date(dueAt).getTime() : 0, content: dueAt ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}>
+                        <span>{fmtDate(dueAt)}</span>
+                        <UrgencyPill dueDate={dueAt} settled={order.displayFinancialStatus === "PAID"} />
+                      </div>
+                    ) : "—" },
+                  { sortValue: order.displayFinancialStatus, content: (
                       <span className={`status ${order.displayFinancialStatus === "PAID" ? "ok" : isOverdue ? "err" : "info"}`}>
                         {isOverdue ? `Overdue · ${overdueDays}d` : order.displayFinancialStatus}
                       </span>
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{fmt(amt, order.totalPriceSet.shopMoney.currencyCode)}</td>
-                    <td><DownloadInvoiceButton invoice={invoiceData} /></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    ) },
+                  { className: "num", sortValue: amt, content: <span style={{ fontWeight: 600 }}>{fmt(amt, order.totalPriceSet.shopMoney.currencyCode)}</span> },
+                  { content: <DownloadInvoiceButton invoice={invoiceData} /> },
+                ],
+              };
+            })}
+          />
         </div>
       )}
     </div>
