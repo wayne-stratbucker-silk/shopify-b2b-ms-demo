@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { adminQuery } from "@/lib/shopify/admin-client";
@@ -177,9 +178,12 @@ export default async function InvoicesPage() {
                   : 0;
                 const amt = parseFloat(order.totalPriceSet.shopMoney.amount);
                 const invoiceData = buildInvoiceData(order, session.companyName ?? "");
+                const invoiceHref = `/account/invoices/${order.id.split("/").pop()}`;
                 return (
                   <tr key={order.id}>
-                    <td style={{ fontWeight: 600 }}>{order.name}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      <Link href={invoiceHref} className="row-link" style={{ color: "var(--primary)" }}>{order.name}</Link>
+                    </td>
                     <td className="text-sm">{fmtDate(order.createdAt)}</td>
                     <td className="text-sm" style={{ color: isOverdue ? "var(--danger)" : "inherit" }}>
                       {dueAt ? fmtDate(dueAt) : "—"}
