@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { adminQuery } from "@/lib/shopify/admin-client";
+import { SortableTable, type SortColumn, type SortRow } from "@/components/account/sortable-table";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,16 @@ function statusCls(s: string): string {
   if (s === "REFUNDED" || s === "VOIDED") return "muted";
   return "info";
 }
+
+const ORDER_COLUMNS: SortColumn[] = [
+  { header: "Order", sortable: true },
+  { header: "Date", sortable: true },
+  { header: "Buyer", sortable: true },
+  { header: "PO #", thClassName: "col-hide" },
+  { header: "Status", sortable: true },
+  { header: "Total", align: "num", sortable: true },
+  { header: "" },
+];
 
 interface ShopifyOrder {
   id: string;
@@ -130,46 +141,28 @@ export default async function OrdersPage({ searchParams }: Props) {
           No orders yet. <Link href="/" style={{ color: "var(--primary)" }}>Start shopping →</Link>
         </div>
       ) : (
-        <table className="tbl tbl-mobile-cards">
-          <thead>
-            <tr>
-              <th>Order</th>
-              <th>Date</th>
-              <th>Buyer</th>
-              <th className="col-hide">PO #</th>
-              <th>Status</th>
-              <th className="num">Total</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map(order => {
-              const amt = parseFloat(order.totalPriceSet.shopMoney.amount);
-              const buyer = order.customer ? `${order.customer.firstName ?? ""} ${order.customer.lastName ?? ""}`.trim() : "—";
-              return (
-                <tr key={order.id}>
-                  <td className="col-primary">
-                    <Link href={`/account/orders/${order.id.split('/').pop()}`} className="tbl row-link">{order.name}</Link>
-                  </td>
-                  <td className="col-meta muted">{fmtDate(order.createdAt)}</td>
-                  <td className="col-meta">{buyer || "—"}</td>
-                  <td className="col-hide mono" style={{ fontSize: 12 }}>{order.poNumber || "—"}</td>
-                  <td className="col-status">
-                    <span className={`status status-${statusCls(order.displayFinancialStatus)}`}>
-                      {order.displayFinancialStatus}
-                    </span>
-                  </td>
-                  <td className="col-value num">{fmt(amt, order.totalPriceSet.shopMoney.currencyCode)}</td>
-                  <td className="col-action">
-                    <Link href={`/account/orders/${order.id.split('/').pop()}`} className="btn btn-ghost btn-xs">
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <SortableTable
+          tableClassName="tbl tbl-mobile-cards"
+          initialSort={{ index: 1, dir: "desc" }}
+          columns={ORDER_COLUMNS}
+          rows={orders.map((order): SortRow => {
+            const amt = parseFloat(order.totalPriceSet.shopMoney.amount);
+            const buyer = order.customer ? `${order.customer.firstName ?? ""} ${order.customer.lastName ?? ""}`.trim() : "";
+            const href = `/account/orders/${order.id.split("/").pop()}`;
+            return {
+              key: order.id,
+              cells: [
+                { className: "col-primary", sortValue: order.name, content: <Link href={href} className="tbl row-link">{order.name}</Link> },
+                { className: "col-meta muted", sortValue: new Date(order.createdAt).getTime(), content: fmtDate(order.createdAt) },
+                { className: "col-meta", sortValue: buyer.toLowerCase(), content: buyer || "—" },
+                { className: "col-hide mono", sortValue: order.poNumber ?? "", content: <span style={{ fontSize: 12 }}>{order.poNumber || "—"}</span> },
+                { className: "col-status", sortValue: order.displayFinancialStatus, content: <span className={`status status-${statusCls(order.displayFinancialStatus)}`}>{order.displayFinancialStatus}</span> },
+                { className: "col-value num", sortValue: amt, content: fmt(amt, order.totalPriceSet.shopMoney.currencyCode) },
+                { className: "col-action", content: <Link href={href} className="btn btn-ghost btn-xs">View</Link> },
+              ],
+            };
+          })}
+        />
       )}
     </div>
   );
