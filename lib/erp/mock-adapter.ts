@@ -22,13 +22,16 @@ class MockErpAdapter implements ErpAdapter {
 
     // Deterministic per-company values. Bucket by companyId modulo a small
     // set so the demo always shows the same numbers for the same company.
+    // The buckets are tuned to show a range of B2B credit states:
+    //   0 healthy · 1 healthy (enforced limit) · 2 near-limit (enforced) ·
+    //   3 ON CREDIT HOLD · 4 healthy (large advisory limit).
     const bucket = companyId % 5;
     const profiles: Array<Omit<CompanyFinancials, "companyId" | "syncedAt">> = [
-      { creditLimit: 50_000, arBalance: 12_450.18, paymentTerms: "Net 30" },
-      { creditLimit: 100_000, arBalance: 38_900.00, paymentTerms: "Net 30" },
-      { creditLimit: 250_000, arBalance: 198_223.45, paymentTerms: "Net 45" },
-      { creditLimit: 25_000, arBalance: 1_245.00, paymentTerms: "Net 15" },
-      { creditLimit: 500_000, arBalance: 87_400.00, paymentTerms: "Net 60" },
+      { creditEnabled: true, creditLimit: 50_000, arBalance: 12_450.18, paymentTerms: "Net 30", creditHold: false, limitPurchases: false },
+      { creditEnabled: true, creditLimit: 100_000, arBalance: 38_900.00, paymentTerms: "Net 30", creditHold: false, limitPurchases: true },
+      { creditEnabled: true, creditLimit: 250_000, arBalance: 198_223.45, paymentTerms: "Net 45", creditHold: false, limitPurchases: true },
+      { creditEnabled: true, creditLimit: 25_000, arBalance: 1_245.00, paymentTerms: "Net 15", creditHold: true, limitPurchases: true },
+      { creditEnabled: true, creditLimit: 500_000, arBalance: 87_400.00, paymentTerms: "Net 60", creditHold: false, limitPurchases: false },
     ];
     const profile = profiles[bucket];
 

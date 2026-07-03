@@ -1,5 +1,7 @@
 import { getSession } from "@/lib/auth/session";
 import { adminQuery } from "@/lib/shopify/admin-client";
+import { getCreditLine } from "@/lib/b2b/credit";
+import { CreditLineCard } from "@/components/account/credit-line-card";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -78,11 +80,12 @@ export default async function AccountDashboard() {
     ? session.name.split(" ")[0]
     : session.email.split("@")[0];
 
-  const [orders, salesRep] = await Promise.all([
+  const [orders, salesRep, credit] = await Promise.all([
     getRecentOrders(session.companyId, session.customerId),
     session.companyId && session.companyId !== "default"
       ? getSalesRep(session.companyId)
       : Promise.resolve(null),
+    getCreditLine(session),
   ]);
 
   return (
@@ -99,6 +102,13 @@ export default async function AccountDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Credit line summary */}
+        {credit && (
+          <div style={{ marginBottom: 24, maxWidth: 420 }}>
+            <CreditLineCard credit={credit} />
+          </div>
+        )}
 
         {/* Row: Recent Orders (wider) + Sales rep (narrower) — stacks on mobile */}
         <div className="dash-orders-row" style={{ marginBottom: 24 }}>
