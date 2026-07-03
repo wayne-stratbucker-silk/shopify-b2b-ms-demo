@@ -2,7 +2,10 @@ import { getSession } from "@/lib/auth/session";
 import { adminQuery } from "@/lib/shopify/admin-client";
 import { getCreditLine } from "@/lib/b2b/credit";
 import { getSalesRep } from "@/lib/b2b/sales-rep";
+import { getQuotesForCustomer } from "@/lib/quotes/client";
+import { getLists } from "@/lib/lists/client";
 import { CreditLineCard } from "@/components/account/credit-line-card";
+import { OpenQuotesCard, SavedListsCard } from "@/components/account/dashboard-regions";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -54,13 +57,17 @@ export default async function AccountDashboard() {
     ? session.name.split(" ")[0]
     : session.email.split("@")[0];
 
-  const [orders, salesRep, credit] = await Promise.all([
+  const [orders, salesRep, credit, quotes, lists] = await Promise.all([
     getRecentOrders(session.companyId, session.customerId),
-    session.companyId && session.companyId !== "default"
-      ? getSalesRep(session.companyId)
-      : Promise.resolve(null),
+    getSalesRep(session.companyId),
     getCreditLine(session),
+    getQuotesForCustomer(session.customerId).catch(() => []),
+    session.companyId && session.companyId !== "default"
+      ? getLists(session.companyId).catch(() => [])
+      : Promise.resolve([]),
   ]);
+
+  const activeQuotes = quotes.filter((q) => !["ordered", "expired", "archived"].includes(q.status));
 
   return (
     <div>
@@ -169,6 +176,12 @@ export default async function AccountDashboard() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Row: Open quotes + Saved lists */}
+        <div className="g2" style={{ marginBottom: 24 }}>
+          <OpenQuotesCard quotes={activeQuotes} />
+          <SavedListsCard lists={lists} />
         </div>
       </div>
     </div>
