@@ -20,10 +20,10 @@ async function fetchRelatedProducts(currentHandle: string, catSlug: string): Pro
   if (!seed) return [];
   return seed.products.filter((p) => p.handle && p.handle !== currentHandle).slice(0, 4);
 }
-async function fetchProductReviewCount(_id: string): Promise<number> { return 0; }
 import { getSession } from "@/lib/auth/session";
 import { getSalesRep } from "@/lib/b2b/sales-rep";
 import { fetchCollectionPLP } from "@/lib/algolia/collection-products";
+import { getProductReviews } from "@/lib/reviews";
 import { client } from "@/lib/makeswift/client";
 import type { Product } from "@/types";
 
@@ -137,10 +137,11 @@ export async function PDPPage({ result }: { result: PDPResult }) {
     .replace(/\s+&\s+/g, "-")
     .replace(/\s+/g, "-");
 
-  const [related, reviewCount] = await Promise.all([
+  const [related, reviews] = await Promise.all([
     fetchRelatedProducts(product.handle, catSlug),
-    fetchProductReviewCount(String(rawId)),
+    getProductReviews(String(rawId)),
   ]);
+  const reviewCount = reviews.count;
 
   const aboutHtml = product.warranty;
 
@@ -261,6 +262,8 @@ export async function PDPPage({ result }: { result: PDPResult }) {
             specs={product.specs}
             description={sanitizeBcHtml(product.description)}
             reviewCount={reviewCount}
+            rating={reviews.rating}
+            reviews={reviews.reviews}
           />
 
           {/* Globally-linked Makeswift region — admins drop any registered
