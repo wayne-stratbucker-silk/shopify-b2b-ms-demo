@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/security/rate-limit";
 
 const KLAVIYO_LIST_ID = process.env.KLAVIYO_LIST_ID;
 const KLAVIYO_API_KEY = process.env.KLAVIYO_API_KEY;
 
 export async function POST(req: Request) {
+  const limited = enforceRateLimit(req, "newsletter", 5, 60_000);
+  if (limited) return limited;
+
   let email: string | undefined;
   try {
     const body = await req.json() as { email?: string };
