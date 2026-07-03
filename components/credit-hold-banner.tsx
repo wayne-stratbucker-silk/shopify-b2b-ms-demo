@@ -1,8 +1,9 @@
 import { getSession } from "@/lib/auth/session";
 import { getCreditLine, isOnCreditHold } from "@/lib/b2b/credit";
+import { brand } from "@/lib/brand/config";
 
-const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_AR_EMAIL || "ar@acme-demo.com";
-const SUPPORT_PHONE = process.env.NEXT_PUBLIC_AR_PHONE || "1-800-555-0139";
+const SUPPORT_EMAIL = brand.arEmail;
+const SUPPORT_PHONE = brand.arPhone;
 
 /**
  * Global alert shown across the account area when the buyer's active company
