@@ -11,6 +11,8 @@ import {
 } from "@/lib/b2b/invoices";
 import { DownloadInvoiceButton, type InvoiceData } from "@/components/account/download-invoice-button";
 import { PayInvoiceButton } from "@/components/account/pay-invoice-button";
+import { RecordFilesMenu } from "@/components/account/record-files-menu";
+import { listRecordFiles, toFileView } from "@/lib/b2b/company-files";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +103,9 @@ export default async function InvoiceDetailPage({ params }: Props) {
   const showPay = canPay && !isPaid && outstanding > 0;
 
   const successfulTx = order.transactions.filter(t => t.status === "SUCCESS");
+  const recordFiles = session.companyId
+    ? (await listRecordFiles(session.companyId, "invoice", invoiceId)).map(toFileView)
+    : [];
 
   return (
     <div>
@@ -114,9 +119,12 @@ export default async function InvoiceDetailPage({ params }: Props) {
               {order.paymentTerms?.paymentTermsName ? ` · ${order.paymentTerms.paymentTermsName}` : ""}
             </p>
           </div>
-          <span className={`status ${isPaid ? "ok" : isOverdue ? "err" : "info"}`}>
-            {isPaid ? "Paid" : isOverdue ? `Overdue · ${overdueDays}d` : order.displayFinancialStatus}
-          </span>
+          <div className="row" style={{ gap: 10, alignItems: "center" }}>
+            <RecordFilesMenu files={recordFiles} label="Documents" />
+            <span className={`status ${isPaid ? "ok" : isOverdue ? "err" : "info"}`}>
+              {isPaid ? "Paid" : isOverdue ? `Overdue · ${overdueDays}d` : order.displayFinancialStatus}
+            </span>
+          </div>
         </div>
       </div>
 

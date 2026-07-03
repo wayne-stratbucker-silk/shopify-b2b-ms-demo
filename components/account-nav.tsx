@@ -42,9 +42,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Organization",
     items: [
-      { href: "/account/users",       label: "Users & roles",  ic: "users",     matches: ["/account/users"] },
-      { href: "/account/addresses",   label: "Addresses",      ic: "pin",       matches: ["/account/addresses"] },
-      { href: "/account/settings",    label: "Settings",       ic: "settings",  matches: ["/account/settings"] },
+      { href: "/account/users",         label: "Users & roles",  ic: "users",     matches: ["/account/users"] },
+      { href: "/account/addresses",     label: "Addresses",      ic: "pin",       matches: ["/account/addresses"] },
+      { href: "/account/company-files", label: "Company files",  ic: "doc",       matches: ["/account/company-files"] },
+      { href: "/account/settings",      label: "Settings",       ic: "settings",  matches: ["/account/settings"] },
     ],
   },
 ];
