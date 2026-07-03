@@ -15,6 +15,7 @@ type ProductOptionConfig = { displayName: string; optionId: number; displayStyle
 async function fetchRelatedProducts(_p: unknown, _s: unknown): Promise<unknown[]> { return []; }
 async function fetchProductReviewCount(_id: string): Promise<number> { return 0; }
 import { getSession } from "@/lib/auth/session";
+import { getSalesRep } from "@/lib/b2b/sales-rep";
 import { client } from "@/lib/makeswift/client";
 import type { Product } from "@/types";
 
@@ -121,6 +122,7 @@ export async function PDPPage({ result }: { result: PDPResult }) {
 
   const session = await getSession();
   const isLoggedIn = !!session;
+  const salesRep = await getSalesRep(session?.companyId);
 
   const catSlug = product.category
     .toLowerCase()
@@ -288,7 +290,7 @@ export async function PDPPage({ result }: { result: PDPResult }) {
               />
             </div>
           ) : (
-            <PdpContactCard />
+            <PdpContactCard salesRep={salesRep} />
           )}
         </aside>
       </div>

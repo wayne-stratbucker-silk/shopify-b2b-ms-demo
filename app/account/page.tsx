@@ -1,12 +1,11 @@
 import { getSession } from "@/lib/auth/session";
 import { adminQuery } from "@/lib/shopify/admin-client";
 import { getCreditLine } from "@/lib/b2b/credit";
+import { getSalesRep } from "@/lib/b2b/sales-rep";
 import { CreditLineCard } from "@/components/account/credit-line-card";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
-
-interface SalesRep { name: string; title: string; email?: string; phone?: string; initials: string }
 
 async function getRecentOrders(companyId: string | undefined, customerId: string) {
   let query: string;
@@ -29,31 +28,6 @@ async function getRecentOrders(companyId: string | undefined, customerId: string
     { query }
   ).catch(() => ({ orders: { edges: [] } }));
   return data.orders.edges.map(e => e.node);
-}
-
-async function getSalesRep(companyId: string): Promise<SalesRep | null> {
-  const data = await adminQuery<{
-    company: { metafields: { edges: Array<{ node: { key: string; value: string } }> } } | null;
-  }>(
-    `query GetSalesRepMeta($id: ID!) {
-      company(id: $id) {
-        metafields(first: 10, namespace: "sales_rep") {
-          edges { node { key value } }
-        }
-      }
-    }`,
-    { id: companyId }
-  ).catch(() => ({ company: null }));
-
-  const mf = data.company?.metafields?.edges?.map(e => e.node) ?? [];
-  if (mf.length === 0) return null;
-
-  const get = (k: string) => mf.find(m => m.key === k)?.value ?? "";
-  const name = get("name");
-  if (!name) return null;
-
-  const initials = name.split(" ").map((w: string) => w[0] ?? "").join("").slice(0, 2).toUpperCase();
-  return { name, initials, title: get("title"), email: get("email") || undefined, phone: get("phone") || undefined };
 }
 
 const fmt = (n: number, currency = "USD") =>
