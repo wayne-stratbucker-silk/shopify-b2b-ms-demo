@@ -3,6 +3,9 @@ import { getCart } from "@/lib/shopify/queries/cart";
 import Link from "next/link";
 import Image from "next/image";
 import { CartActions } from "./cart-actions";
+import { ExpressCheckout } from "@/components/express-checkout";
+import { getSession } from "@/lib/auth/session";
+import { checkExpressEligibility } from "@/lib/checkout/express";
 
 const CART_COOKIE = "shopify_cart_id";
 
@@ -40,6 +43,12 @@ export default async function CartPage() {
 
   const subtotal = parseFloat(cart.cost.subtotalAmount.amount);
   const currency = cart.cost.subtotalAmount.currencyCode;
+
+  // B2B buyers on payment terms can place the order on account (express checkout)
+  // instead of the hosted card checkout. Structural eligibility only — the
+  // credit-limit check happens when the order is prepared/placed.
+  const session = await getSession();
+  const expressEligibility = await checkExpressEligibility(session);
 
   return (
     <div className="container section">
@@ -80,6 +89,11 @@ export default async function CartPage() {
           <CartActions
             checkoutUrl={cart.checkoutUrl}
             lines={cart.lines.edges.map(({ node }) => node)}
+          />
+          <ExpressCheckout
+            eligible={expressEligibility.eligible}
+            reason={expressEligibility.reason}
+            netTerms={expressEligibility.netTerms}
           />
           <Link href="/" className="btn btn-ghost btn-block" style={{ textAlign: "center", display: "block", marginTop: 8 }}>
             Continue Shopping
