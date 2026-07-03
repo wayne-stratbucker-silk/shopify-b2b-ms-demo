@@ -7,7 +7,10 @@ import { ToastProvider } from "@/components/ui/toast";
 import { QuoteCartFab } from "@/components/quote-cart-fab";
 import { CompareProvider } from "@/components/compare/compare-provider";
 import { CompareBar } from "@/components/compare/compare-bar";
+import { LocaleProvider } from "@/components/i18n/locale-provider";
 import { getSession } from "@/lib/auth/session";
+import { cookies } from "next/headers";
+import { LOCALE_COOKIE, DEFAULT_LOCALE, isLocale } from "@/lib/i18n/config";
 import "@/components/makeswift/register";
 
 const HEADER_NAV_ID = "acme-b2b-header-nav";
@@ -31,22 +34,27 @@ async function getHeaderAccountInfo(): Promise<HeaderAccountInfo | null> {
 }
 
 export default async function StorefrontLayout({ children }: { children: React.ReactNode }) {
-  const [accountInfo, headerNavSlot, footerNavSlot] = await Promise.all([
+  const [accountInfo, headerNavSlot, footerNavSlot, jar] = await Promise.all([
     getHeaderAccountInfo(),
     HeaderNavSlot(),
     FooterNavSlot(),
+    cookies(),
   ]);
+  const cookieLocale = jar.get(LOCALE_COOKIE)?.value;
+  const initialLocale = isLocale(cookieLocale) ? cookieLocale : DEFAULT_LOCALE;
 
   return (
-    <ToastProvider>
-      <CompareProvider>
-        <Header accountInfo={accountInfo} />
-        {headerNavSlot}
-        <main id="main-content">{children}</main>
-        <Footer navSlot={footerNavSlot} />
-        <QuoteCartFab />
-        <CompareBar />
-      </CompareProvider>
-    </ToastProvider>
+    <LocaleProvider initialLocale={initialLocale}>
+      <ToastProvider>
+        <CompareProvider>
+          <Header accountInfo={accountInfo} />
+          {headerNavSlot}
+          <main id="main-content">{children}</main>
+          <Footer navSlot={footerNavSlot} />
+          <QuoteCartFab />
+          <CompareBar />
+        </CompareProvider>
+      </ToastProvider>
+    </LocaleProvider>
   );
 }
