@@ -22,18 +22,19 @@ import { bcContentUrl } from "@/lib/bigcommerce/content-url";
 // tiles, and document library. The library is FULLY ADMIN-CURATED — there is no
 // runtime auto-listing. Admins build the list in the Makeswift panel:
 //
-//   1. "WebDAV folder" picker — a dropdown of the subfolders under BC
-//      `/content/file-search/` (from /api/bc/webdav/folders). Sets the default
-//      category for files that don't carry their own folder.
+//   1. "Category" picker — a dropdown of resource-center categories (from
+//      /api/shopify/files/folders). Sets the default category for files that
+//      don't carry their own.
 //   2. "Files" list — each row's "File" control is a searchable dropdown of the
-//      files in BC WebDAV (/api/bc/webdav/files), so admins pick files instead
+//      store's Shopify Files (/api/shopify/files), so admins pick files instead
 //      of typing names/URLs. An optional URL field stays for external links or
 //      files not yet uploaded.
 //
-// Both dropdowns hit the WebDAV routes at EDIT TIME only (Makeswift Combobox
-// getOptions), never at render — the storefront renders only the selected rows.
-// Subfolders define categories (e.g. a file in `spec-sheets/` → "Spec Sheets");
-// top-level files land in "General".
+// Both dropdowns hit the Shopify Files routes at EDIT TIME only (Makeswift
+// Combobox getOptions), never at render — the storefront renders only the
+// selected rows. Shopify Files is flat, so categories are inferred from
+// filename conventions (spec/install/cad/rebate → Spec Sheets, etc.); files
+// that match nothing land in "General".
 //
 // Matches the demo's three-section layout 1:1 (Resource Center Desktop.html /
 // Mobile.html) and reuses the existing site design-system primitives in
@@ -249,14 +250,14 @@ function entryToFileRow(item: FileEntry, folderDefault: string): FileRow | null 
 // routes — the same pattern as header-nav's categoryOptions. They are NOT used
 // at render; the storefront shows only the selected rows.
 
-// Subfolders under /content/file-search/, for the top-level "WebDAV folder"
-// picker. A leading "All folders" option maps to root ("").
+// Resource-center categories for the top-level "Category" picker. A leading
+// "All folders" option maps to root ("").
 async function folderOptions(query: string) {
   const opts: { id: string; label: string; value: FolderRef }[] = [
     { id: "__root__", label: "All folders (General)", value: { path: "" } },
   ];
   try {
-    const res = await fetch("/api/bc/webdav/folders");
+    const res = await fetch("/api/shopify/files/folders");
     const json = await res.json();
     if (json?.ok && json.configured) {
       for (const path of json.folders as string[]) {
@@ -270,11 +271,11 @@ async function folderOptions(query: string) {
   return q ? opts.filter((o) => o.label.toLowerCase().includes(q)) : opts;
 }
 
-// Every file in BC WebDAV, folder-prefixed, for the per-row "File" picker.
+// Every store file (Shopify Files), category-prefixed, for the per-row picker.
 async function fileOptions(query: string) {
   const opts: { id: string; label: string; value: FileRef }[] = [];
   try {
-    const res = await fetch("/api/bc/webdav/files");
+    const res = await fetch("/api/shopify/files");
     const json = await res.json();
     if (json?.ok && json.configured) {
       for (const f of json.files as {
@@ -915,16 +916,16 @@ runtime.registerComponent(FileSearch, {
     tilesEyebrow: RichText({ mode: RichText.Mode.Inline, defaultValue: "BROWSE BY TYPE" }),
     tilesHeading: RichText({ mode: RichText.Mode.Inline, defaultValue: "Resource categories" }),
 
-    // ── WebDAV folder (dropdown of subfolders under /content/file-search/) ──
-    // Picked from /api/bc/webdav/folders so the admin never types a path. Sets
-    // the default category for selected files that have no subfolder of their
-    // own. Leave on "All folders" to default everything to "General".
-    folder: Combobox({ label: "WebDAV folder", getOptions: folderOptions }),
+    // ── Category (resource-center categories) ──────────────────────────────
+    // Picked from /api/shopify/files/folders so the admin never types a path.
+    // Sets the default category for selected files that have no category of
+    // their own. Leave on "All folders" to default everything to "General".
+    folder: Combobox({ label: "Category", getOptions: folderOptions }),
 
     // ── Files (admin-curated) ──────────────────────────────────────────────
     // The ONLY file source — there is no runtime auto-listing. Each row's
-    // "File" control is a searchable dropdown of the files in BC WebDAV
-    // (/api/bc/webdav/files), so admins pick instead of typing. The optional
+    // "File" control is a searchable dropdown of the store's Shopify Files
+    // (/api/shopify/files), so admins pick instead of typing. The optional
     // URL is a fallback for external links / files not yet uploaded.
     files: List({
       label: "Files",
