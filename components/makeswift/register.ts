@@ -31,3 +31,4 @@ import "@/components/makeswift/testimonial-widget";
 import "@/components/makeswift/rich-document";
 import "@/components/makeswift/plp-interstitial";
 import "@/components/makeswift/not-found-page";
+import "@/components/makeswift/seo-page-auditor";
