@@ -6,6 +6,7 @@ import { Header, type HeaderAccountInfo } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { AccountNav } from "@/components/account-nav";
 import { CreditHoldBanner } from "@/components/credit-hold-banner";
+import { AccountAlertsBell } from "@/components/account/alerts-bell";
 import { ToastProvider } from "@/components/ui/toast";
 import { QuoteCartFab } from "@/components/quote-cart-fab";
 import { getSession } from "@/lib/auth/session";
@@ -43,6 +44,9 @@ export default async function AccountLayout({ children }: { children: React.Reac
       <Header accountInfo={accountInfo} />
       {headerSnap && <MakeswiftComponent snapshot={headerSnap} label="Header Navigation" type="acme/header-nav" />}
       <div className="container">
+        <div className="row" style={{ justifyContent: "flex-end", paddingTop: 10 }}>
+          <AccountAlertsBell />
+        </div>
         <CreditHoldBanner />
         <div className="account-shell">
           <AccountNav />
