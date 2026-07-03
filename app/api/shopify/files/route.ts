@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { adminQuery } from "@/lib/shopify/admin-client";
 
+// Lists store Files (Shopify Files API) for the Makeswift file-search widget's
+// picker — EDIT TIME only, never called during storefront rendering. Shopify
+// Files is flat (no folders), so a resource-center "folder" is inferred from
+// filename conventions (see inferFolder + /api/shopify/files/folders).
+
 interface ShopifyFile {
   id: string;
   alt: string | null;
@@ -9,11 +14,8 @@ interface ShopifyFile {
   preview: { image: { url: string } } | null;
 }
 
-// Shopify Files API equivalent of the old BC WebDAV file listing.
-// Used by the Makeswift file-search component's Combobox at EDIT TIME only —
-// never called during storefront rendering.
-// Files must be tagged with "resource-center" in Shopify Admin → Content → Files
-// (via the file's alt text or filename convention).
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const data = await adminQuery<{
@@ -46,8 +48,7 @@ export async function GET() {
         const url = (node as { url?: string }).url ?? node.preview?.image?.url ?? "";
         if (!url) return null;
         const filename = url.split("/").pop()?.split("?")[0] ?? node.id;
-        const folder = inferFolder(filename);
-        return { path: url, name: filename, folder };
+        return { path: url, name: filename, folder: inferFolder(filename) };
       })
       .filter(Boolean);
 
