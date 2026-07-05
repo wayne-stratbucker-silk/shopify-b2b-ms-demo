@@ -86,11 +86,16 @@ export function ProductCard({ product: p, listName, index }: ProductCardProps) {
                 /ea
               </small>
             </div>
-            {bestSavingsPct > 0 && (
-              <div className="tier-hint">
-                Save {bestSavingsPct}% at {p.tiers[p.tiers.length - 1].minQty}+
-              </div>
-            )}
+            {/* Always render the tier-hint line (blank when there's no bulk
+                saving) so the async customer-pricing overlay — which resolves
+                bulk tiers AFTER hydration and is absent from the SSR HTML — can
+                fill it without growing the card and reflowing the grid. Also
+                keeps card heights uniform whether or not a tier saving applies. */}
+            <div className="tier-hint" aria-hidden={bestSavingsPct === 0 || undefined}>
+              {bestSavingsPct > 0
+                ? `Save ${bestSavingsPct}% at ${p.tiers[p.tiers.length - 1].minQty}+`
+                : " "}
+            </div>
           </div>
           <span className="list-price" style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-geist-mono, monospace)" }}>
             List ${p.listPrice.toFixed(2)}
