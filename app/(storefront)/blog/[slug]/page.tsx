@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getArticle } from "@/lib/blog";
-import { sanitizeBcHtml } from "@/lib/html/sanitize";
+import { ContentWithRegions } from "@/components/makeswift/content-regions";
 
 export const dynamic = "force-dynamic";
 
@@ -36,11 +36,7 @@ export default async function ArticlePage({ params }: Props) {
           <Image src={article.image.url} alt={article.image.altText ?? article.title} fill sizes="760px" style={{ objectFit: "cover" }} priority />
         </div>
       )}
-      <div
-        className="blog-content"
-        style={{ fontSize: 15, lineHeight: 1.7, color: "var(--ink-2)" }}
-        dangerouslySetInnerHTML={{ __html: sanitizeBcHtml(article.contentHtml) }}
-      />
+      <ContentWithRegions html={article.contentHtml} />
     </div>
   );
 }
