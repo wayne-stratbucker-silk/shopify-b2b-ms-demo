@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   jar.delete("shopify_oauth_state");
 
   // Verify HMAC
-  const clientSecret = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_SECRET!;
+  const clientSecret = process.env.SHOPIFY_API_SECRET!;
   const params = Object.fromEntries(url.searchParams);
   delete params.hmac;
   const message = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join("&");
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      client_id: process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID,
+      client_id: process.env.SHOPIFY_API_KEY,
       client_secret: clientSecret,
       code,
     }),

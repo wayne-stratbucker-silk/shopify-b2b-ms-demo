@@ -1,7 +1,7 @@
 /**
  * Shopify B2B Store Seeding Script
  *
- * Seeds makeswift-b2b-demo.myshopify.com with:
+ * Seeds headless-b2b-demo.myshopify.com with:
  * - 25 electrical/lighting products with variants and metafields
  * - 6 collections (categories)
  * - 3 B2B companies with contacts and locations
@@ -12,10 +12,11 @@
  */
 
 import "dotenv/config";
+import { getAdminToken } from "../lib/shopify/admin-token";
 
-const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? "makeswift-b2b-demo.myshopify.com";
-const ADMIN_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN ?? "";
-const API_VERSION = "2025-04";
+const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? "headless-b2b-demo.myshopify.com";
+const ADMIN_TOKEN = await getAdminToken();
+const API_VERSION = "2026-07";
 const ENDPOINT = `https://${STORE_DOMAIN}/admin/api/${API_VERSION}/graphql.json`;
 
 if (!ADMIN_TOKEN) {
@@ -204,7 +205,7 @@ async function createProducts(collectionIds: Record<string, string>): Promise<st
   for (const product of PRODUCTS) {
     const firstVariant = product.variants[0];
 
-    // Step 1: Create product — variants NOT in ProductInput in 2025-04
+    // Step 1: Create product — variants NOT in ProductInput in 2026-07
     const data = await graphql<{
       productCreate: {
         product: {

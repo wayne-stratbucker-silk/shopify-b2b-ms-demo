@@ -6,11 +6,12 @@
  */
 
 import "dotenv/config";
+import { getAdminToken } from "../lib/shopify/admin-token";
 
 const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN!;
-const ADMIN_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN!;
+const ADMIN_TOKEN = await getAdminToken();
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL!;
-const API_VERSION = "2025-04";
+const API_VERSION = "2026-07";
 
 const TOPICS = [
   "products/create",

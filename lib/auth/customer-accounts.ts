@@ -146,34 +146,28 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
   // If this fails due to missing scopes or non-B2B store, log and continue with empty contacts.
   let companyContacts: CustomerInfo["companyContacts"] = [];
   try {
+    // 2026-07: customer.companyContacts was renamed to companyContactProfiles and
+    // now returns a plain list ([CompanyContact!]!) instead of a connection.
     type B2BData = {
       customer: {
-        companyContacts: {
-          edges: Array<{
-            node: {
-              id: string;
-              company: { id: string; name: string; externalId?: string | null };
-              roleAssignments: { edges: Array<{ node: { companyLocation: { id: string; name: string }; role: { name: string } } }> };
-            };
-          }>;
-        };
+        companyContactProfiles: Array<{
+          id: string;
+          company: { id: string; name: string; externalId?: string | null };
+          roleAssignments: { edges: Array<{ node: { companyLocation: { id: string; name: string }; role: { name: string } } }> };
+        }>;
       } | null;
     };
     const b2bData = await adminQuery<B2BData>(`
       query GetCustomerCompany($id: ID!) {
         customer(id: $id) {
-          companyContacts(first: 1) {
-            edges {
-              node {
-                id
-                company { id name externalId }
-                roleAssignments(first: 10) {
-                  edges {
-                    node {
-                      companyLocation { id name }
-                      role { name }
-                    }
-                  }
+          companyContactProfiles {
+            id
+            company { id name externalId }
+            roleAssignments(first: 10) {
+              edges {
+                node {
+                  companyLocation { id name }
+                  role { name }
                 }
               }
             }
@@ -183,10 +177,10 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
     `, { id: gid });
 
     if (b2bData.customer) {
-      companyContacts = b2bData.customer.companyContacts.edges.map((e) => ({
-        id: e.node.id,
-        company: e.node.company,
-        roleAssignments: e.node.roleAssignments.edges.map((ra) => ({
+      companyContacts = b2bData.customer.companyContactProfiles.map((c) => ({
+        id: c.id,
+        company: c.company,
+        roleAssignments: c.roleAssignments.edges.map((ra) => ({
           companyLocation: ra.node.companyLocation,
           role: ra.node.role,
         })),
@@ -195,7 +189,7 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
   } catch (e) {
     const msg = String(e);
     if (msg.includes("doesn't exist on type") || msg.includes("undefinedField")) {
-      console.warn("[customer-accounts] B2B companyContacts field not available (store not on B2B plan) — using address company fallback");
+      console.warn("[customer-accounts] B2B companyContactProfiles field not available (store not on B2B plan) — using address company fallback");
     } else {
       console.warn("[customer-accounts] B2B company query failed:", msg);
     }
@@ -217,7 +211,8 @@ export function buildSession(customer: CustomerInfo): Session {
   const contact = customer.companyContacts[0];
   const firstAssignment = contact?.roleAssignments[0];
   const roleName = firstAssignment?.role?.name?.toLowerCase() ?? "buyer";
-  const role: "admin" | "buyer" = roleName === "admin" ? "admin" : "buyer";
+  // Default B2B roles are named e.g. "Location admin" / "Ordering only".
+  const role: "admin" | "buyer" = /admin/i.test(roleName) ? "admin" : "buyer";
 
   const displayName = `${customer.firstName} ${customer.lastName}`.trim();
 

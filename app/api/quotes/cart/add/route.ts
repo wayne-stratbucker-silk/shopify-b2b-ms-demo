@@ -55,11 +55,11 @@ export async function POST(req: Request) {
       let companyContactId: string | undefined;
       if (session.customerId) {
         const data = await adminQuery<{
-          customer: { companyContacts: { edges: Array<{ node: { id: string } }> } } | null;
+          customer: { companyContactProfiles: Array<{ id: string }> } | null;
         }>(
-          `query { customer(id: "${session.customerId}") { companyContacts(first:1) { edges { node { id } } } } }`
+          `query { customer(id: "${session.customerId}") { companyContactProfiles { id } } }`
         ).catch(() => ({ customer: null }));
-        companyContactId = data.customer?.companyContacts?.edges?.[0]?.node.id;
+        companyContactId = data.customer?.companyContactProfiles?.[0]?.id;
       }
 
       const created = await createCartDraftOrder(session.customerId, [newItem], {

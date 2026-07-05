@@ -38,19 +38,16 @@ const DRAFT_ORDER_FIELDS = `
   poNumber
   note
   tags
-  metafields(identifiers: [
-    { namespace: "quote", key: "status" },
-    { namespace: "quote", key: "title" },
-    { namespace: "quote", key: "reference_number" },
-    { namespace: "quote", key: "expires_at" },
-    { namespace: "quote", key: "notes_thread" }
-  ]) { namespace key value }
+  metafields(first: 20, namespace: "quote") { edges { node { namespace key value } } }
 `;
 
-function getMeta(metafields: Array<{ namespace: string; key: string; value: string } | null>, key: string): string {
-  return (metafields ?? []).filter(Boolean).find(
-    (m) => m!.namespace === QUOTE_NAMESPACE && m!.key === key,
-  )?.value ?? "";
+// 2026-07: Admin metafields no longer accepts `identifiers` and is a connection.
+function getMeta(
+  metafields: { edges: Array<{ node: { namespace: string; key: string; value: string } }> } | null | undefined,
+  key: string,
+): string {
+  const nodes = metafields?.edges?.map((e) => e.node) ?? [];
+  return nodes.find((m) => m.namespace === QUOTE_NAMESPACE && m.key === key)?.value ?? "";
 }
 
 function statusLabel(status: QuoteStatus): string {
@@ -196,16 +193,19 @@ export async function createCartDraftOrder(
     {
       input: {
         lineItems,
-        customerId,
-        purchasingEntity: opts?.companyLocationId
+        // 2026-07: draftOrderCreate rejects sending both customer and
+        // purchasing_entity — use purchasingEntity for B2B, else customerId.
+        ...(opts?.companyLocationId
           ? {
-              purchasingCompany: {
-                companyId: opts.companyId,
-                companyLocationId: opts.companyLocationId,
-                companyContactId: opts.companyContactId,
+              purchasingEntity: {
+                purchasingCompany: {
+                  companyId: opts.companyId,
+                  companyLocationId: opts.companyLocationId,
+                  companyContactId: opts.companyContactId,
+                },
               },
             }
-          : undefined,
+          : { customerId }),
         tags: [CART_TAG],
         metafields: [
           { namespace: QUOTE_NAMESPACE, key: "status", value: "draft", type: "single_line_text_field" },
@@ -355,16 +355,19 @@ export async function createQuote(input: CreateQuoteInput): Promise<{ id: string
     {
       input: {
         lineItems: input.lineItems,
-        customerId: input.customerId,
-        purchasingEntity: input.companyLocationId
+        // 2026-07: draftOrderCreate rejects sending both customer and
+        // purchasing_entity — use purchasingEntity for B2B, else customerId.
+        ...(input.companyLocationId
           ? {
-              purchasingCompany: {
-                companyId: input.companyId,
-                companyLocationId: input.companyLocationId,
-                companyContactId: input.companyContactId,
+              purchasingEntity: {
+                purchasingCompany: {
+                  companyId: input.companyId,
+                  companyLocationId: input.companyLocationId,
+                  companyContactId: input.companyContactId,
+                },
               },
             }
-          : undefined,
+          : { customerId: input.customerId }),
         poNumber: input.poNumber,
         note: input.notes,
         shippingAddress: input.shippingAddress,

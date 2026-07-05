@@ -7,13 +7,14 @@
 
 import "dotenv/config";
 import { algoliasearch } from "algoliasearch";
+import { getAdminToken } from "../lib/shopify/admin-token";
 
 const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN!;
-const ADMIN_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN!;
+const ADMIN_TOKEN = await getAdminToken();
 const ALGOLIA_APP_ID = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID!;
 const ALGOLIA_ADMIN_KEY = process.env.ALGOLIA_ADMIN_KEY!;
 const INDEX_NAME = process.env.ALGOLIA_INDEX_NAME ?? "shopify-b2b-demo";
-const API_VERSION = "2025-04";
+const API_VERSION = "2026-07";
 
 if (!ADMIN_TOKEN || !ALGOLIA_APP_ID || !ALGOLIA_ADMIN_KEY) {
   console.error("❌ Missing required env vars: SHOPIFY_ADMIN_API_TOKEN, NEXT_PUBLIC_ALGOLIA_APP_ID, ALGOLIA_ADMIN_KEY");
@@ -58,7 +59,7 @@ interface ShopifyProduct {
       };
     }>;
   };
-  metafields: Array<{ key: string; value: string } | null>;
+  metafield: { value: string } | null;
 }
 
 async function fetchAllProducts(): Promise<ShopifyProduct[]> {
@@ -93,9 +94,7 @@ async function fetchAllProducts(): Promise<ShopifyProduct[]> {
                         }
                       }
                     }
-                    metafields(identifiers: [{ namespace: "custom", key: "uom" }]) {
-                      key value
-                    }
+                    metafield(namespace: "custom", key: "uom") { value }
                   }
                 }
                 pageInfo { hasNextPage }
@@ -135,7 +134,7 @@ function toAlgoliaRecord(product: ShopifyProduct): AlgoliaRecord {
     (sum, e) => sum + (e.node.inventoryQuantity ?? 0),
     0
   );
-  const uom = (product.metafields ?? []).filter(Boolean).find(m => m!.key === "uom")?.value ?? "EA";
+  const uom = product.metafield?.value ?? "EA";
 
   return {
     objectID: product.id,

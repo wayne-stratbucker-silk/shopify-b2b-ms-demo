@@ -12,18 +12,16 @@
  */
 
 import "dotenv/config";
+import { getAdminToken } from "../lib/shopify/admin-token";
 
 // ─── SECTION A — Boilerplate ──────────────────────────────────────────────────
 
-const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? "makeswift-b2b-demo.myshopify.com";
-const ADMIN_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN ?? "";
-const API_VERSION = "2025-04";
+const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? "headless-b2b-demo.myshopify.com";
+const API_VERSION = "2026-07";
 const ENDPOINT = `https://${STORE_DOMAIN}/admin/api/${API_VERSION}/graphql.json`;
 
-if (!ADMIN_TOKEN) {
-  console.error("❌ SHOPIFY_ADMIN_API_TOKEN is not set. Copy .env.example to .env.local and fill it in.");
-  process.exit(1);
-}
+// Admin token via the client credentials grant (SHOPIFY_API_KEY + SHOPIFY_API_SECRET).
+const ADMIN_TOKEN = await getAdminToken();
 
 async function graphql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
   const res = await fetch(ENDPOINT, {
@@ -39,7 +37,7 @@ async function graphql<T>(query: string, variables?: Record<string, unknown>): P
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
-const REST_URL = `https://${STORE_DOMAIN}/admin/api/2025-04/orders.json`;
+const REST_URL = `https://${STORE_DOMAIN}/admin/api/${API_VERSION}/orders.json`;
 async function restOrder(body: unknown) {
   const r = await fetch(REST_URL, { method: "POST", headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": ADMIN_TOKEN }, body: JSON.stringify(body) });
   if (!r.ok) { console.warn("  REST order failed:", (await r.text()).slice(0, 200)); return null; }
@@ -1158,8 +1156,10 @@ async function createCompanies(prodResults: ProductResult[]): Promise<CompanyRes
     );
 
     const roleEdges = rolesData.company?.contactRoles.edges ?? [];
-    const adminRoleId = roleEdges.find(e => e.node.name.toLowerCase() === "admin")?.node.id ?? "";
-    const buyerRoleId = roleEdges.find(e => e.node.name.toLowerCase() === "buyer")?.node.id ?? "";
+    // Default B2B role names vary by store (e.g. "Location admin" / "Ordering only"),
+    // so match by intent rather than an exact "admin"/"buyer" string.
+    const adminRoleId = roleEdges.find(e => /admin/i.test(e.node.name))?.node.id ?? roleEdges[0]?.node.id ?? "";
+    const buyerRoleId = roleEdges.find(e => /order|buyer/i.test(e.node.name))?.node.id ?? adminRoleId;
 
     // 6. Assign roles to all contacts
     for (let i = 0; i < contactIds.length; i++) {
@@ -1186,17 +1186,19 @@ async function createCompanies(prodResults: ProductResult[]): Promise<CompanyRes
       await sleep(200);
     }
 
-    // 7. Set company metafield for customer SKUs
-    await graphql<{ companyUpdate: { company: { id: string } | null; userErrors: Array<{ message: string }> } }>(
-      `mutation CompanyUpdateMeta($id: ID!, $mf: [MetafieldInput!]!) {
-        companyUpdate(companyId: $id, input: { metafields: $mf }) {
-          company { id }
+    // 7. Set company metafield for customer SKUs.
+    // 2026-07: CompanyInput no longer accepts `metafields` — use metafieldsSet
+    // with the company GID as ownerId.
+    await graphql<{ metafieldsSet: { userErrors: Array<{ message: string }> } }>(
+      `mutation SetCompanySkus($mf: [MetafieldsSetInput!]!) {
+        metafieldsSet(metafields: $mf) {
+          metafields { id }
           userErrors { message }
         }
       }`,
       {
-        id: companyId,
         mf: [{
+          ownerId: companyId,
           namespace: "b2b",
           key: "customer_skus",
           value: JSON.stringify(company.customerSkuMap),
@@ -1232,7 +1234,7 @@ async function createCompanies(prodResults: ProductResult[]): Promise<CompanyRes
       }
     );
 
-    let priceListId = plData.priceListCreate.priceList?.id;
+    const priceListId = plData.priceListCreate.priceList?.id;
     if (!priceListId) {
       console.warn(`    ⚠ PriceList for ${company.name}: ${plData.priceListCreate.userErrors.map(e => e.message).join(", ")}`);
     } else {
@@ -1377,7 +1379,8 @@ async function createQuotes(companies: CompanyResult[], prods: ProductResult[]):
         {
           input: {
             lineItems,
-            customerId: c.mainCustomerId,
+            // 2026-07: draftOrderCreate rejects sending both customer and
+            // purchasing_entity — B2B quotes use purchasingEntity only.
             purchasingEntity: {
               purchasingCompany: {
                 companyId: c.companyId,
