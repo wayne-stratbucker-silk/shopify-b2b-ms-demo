@@ -1,3 +1,4 @@
+import { getAdminToken } from "../lib/shopify/admin-token";
 /**
  * Acme Electric Supply — Test Order Seeder
  *
@@ -12,9 +13,9 @@
 
 // ─── SECTION A — Boilerplate ──────────────────────────────────────────────────
 
-const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? "makeswift-b2b-demo.myshopify.com";
-const ADMIN_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN ?? "";
-const API_VERSION = "2025-04";
+const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? "headless-b2b-demo.myshopify.com";
+const ADMIN_TOKEN = await getAdminToken();
+const API_VERSION = "2026-07";
 const GQL_URL = `https://${STORE_DOMAIN}/admin/api/${API_VERSION}/graphql.json`;
 const REST_URL = `https://${STORE_DOMAIN}/admin/api/${API_VERSION}/orders.json`;
 

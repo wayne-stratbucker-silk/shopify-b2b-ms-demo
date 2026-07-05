@@ -13,11 +13,12 @@
  */
 
 import { config } from "dotenv";
+import { getAdminToken } from "../lib/shopify/admin-token";
 config({ path: ".env.local" });
 
-const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? "makeswift-b2b-demo.myshopify.com";
-const ADMIN_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN ?? "";
-const API_VERSION = "2025-04";
+const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? "headless-b2b-demo.myshopify.com";
+const ADMIN_TOKEN = await getAdminToken();
+const API_VERSION = "2026-07";
 const ENDPOINT = `https://${STORE_DOMAIN}/admin/api/${API_VERSION}/graphql.json`;
 const DRY_RUN = process.env.DRY_RUN === "1";
 

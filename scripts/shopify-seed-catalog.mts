@@ -7,15 +7,16 @@ import { COLLECTIONS as C4, PRODUCTS as P4 } from './catalog-chunks/lighting.mts
 import { COLLECTIONS as C5, PRODUCTS as P5 } from './catalog-chunks/lowvoltage.mts';
 import { COLLECTIONS as C6, PRODUCTS as P6 } from './catalog-chunks/industrial.mts';
 import { COLLECTIONS as C7, PRODUCTS as P7 } from './catalog-chunks/tools.mts';
+import { getAdminToken } from "../lib/shopify/admin-token";
 
 const ALL_COLLECTIONS = [...C0,...C1,...C2,...C3,...C4,...C5,...C6,...C7];
 const ALL_PRODUCTS    = [...P0,...P1,...P2,...P3,...P4,...P5,...P6,...P7];
 
 // ─── Boilerplate (copied from shopify-seed-v2.mts) ───────────────────────────
 
-const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? "makeswift-b2b-demo.myshopify.com";
-const ADMIN_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN ?? "";
-const API_VERSION = "2025-04";
+const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? "headless-b2b-demo.myshopify.com";
+const ADMIN_TOKEN = await getAdminToken();
+const API_VERSION = "2026-07";
 const ENDPOINT = `https://${STORE_DOMAIN}/admin/api/${API_VERSION}/graphql.json`;
 
 if (!ADMIN_TOKEN) {

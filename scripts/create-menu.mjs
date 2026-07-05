@@ -3,9 +3,28 @@ import { resolve } from "path";
 
 config({ path: resolve(process.cwd(), ".env.local") });
 
-const TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
 const DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
-const API = `https://${DOMAIN}/admin/api/2025-04/graphql.json`;
+const API_VERSION = "2026-07";
+const API = `https://${DOMAIN}/admin/api/${API_VERSION}/graphql.json`;
+
+// Mint a short-lived Admin API token via the OAuth client credentials grant
+// (SHOPIFY_API_KEY + SHOPIFY_API_SECRET). Plain .mjs, so inline rather than
+// importing the TS helper.
+async function getAdminToken() {
+  const res = await fetch(`https://${DOMAIN}/admin/oauth/access_token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: process.env.SHOPIFY_API_KEY,
+      client_secret: process.env.SHOPIFY_API_SECRET,
+    }),
+  });
+  if (!res.ok) throw new Error(`client_credentials grant failed ${res.status}: ${await res.text()}`);
+  return (await res.json()).access_token;
+}
+
+const TOKEN = await getAdminToken();
 
 async function gql(query, variables = {}) {
   const res = await fetch(API, {
@@ -16,77 +35,82 @@ async function gql(query, variables = {}) {
   return res.json();
 }
 
-// Canonical collections (no numeric suffixes) — IDs in the 311107* range
-const COLLECTIONS = {
-  "wire-cable":                  { id: "gid://shopify/Collection/311107354707",  title: "Wire & Cable" },
-  "breakers-panels":             { id: "gid://shopify/Collection/311107387475",  title: "Breakers & Panels" },
-  "conduit-fittings":            { id: "gid://shopify/Collection/311107420243",  title: "Conduit & Fittings" },
-  "lighting-fixtures":           { id: "gid://shopify/Collection/311107453011",  title: "Lighting Fixtures" },
-  "switches-receptacles":        { id: "gid://shopify/Collection/311107485779",  title: "Switches & Receptacles" },
-  "tools-safety":                { id: "gid://shopify/Collection/311107518547",  title: "Tools & Safety" },
-  "low-voltage-communications":  { id: "gid://shopify/Collection/311107551315",  title: "Low Voltage & Communications" },
-  "motors-motor-controls":       { id: "gid://shopify/Collection/311107584083",  title: "Motors & Motor Controls" },
-  "transformers":                { id: "gid://shopify/Collection/311107616851",  title: "Transformers" },
-  "enclosures-boxes":            { id: "gid://shopify/Collection/311107649619",  title: "Enclosures & Boxes" },
-  "cable-management":            { id: "gid://shopify/Collection/311107682387",  title: "Cable Management" },
-  "grounding-bonding":           { id: "gid://shopify/Collection/311107715155",  title: "Grounding & Bonding" },
-  "test-measurement":            { id: "gid://shopify/Collection/311107747923",  title: "Test & Measurement" },
-  "industrial-controls":         { id: "gid://shopify/Collection/311107780691",  title: "Industrial Controls" },
-};
-
-function col(handle) {
-  const { id, title } = COLLECTIONS[handle];
-  return { type: "COLLECTION", resourceId: id, title };
+// Store-agnostic: resolve collection GIDs by handle straight from the store
+// (no hardcoded IDs). Pages through all collections → { handle: {id, title} }.
+async function loadCollections() {
+  const map = {};
+  let cursor = null;
+  do {
+    const r = await gql(
+      `query ($cursor: String) {
+        collections(first: 100, after: $cursor) {
+          edges { node { id handle title } }
+          pageInfo { hasNextPage endCursor }
+        }
+      }`,
+      { cursor }
+    );
+    const conn = r.data?.collections;
+    if (!conn) {
+      console.error("❌ Failed to load collections:", JSON.stringify(r.errors || r, null, 2));
+      break;
+    }
+    for (const { node } of conn.edges) map[node.handle] = { id: node.id, title: node.title };
+    cursor = conn.pageInfo.hasNextPage ? conn.pageInfo.endCursor : null;
+  } while (cursor);
+  return map;
 }
 
-// 2-level hierarchy: 5 L1 groups, each with 2–4 L2 collection items
+const COLLECTIONS = await loadCollections();
+console.log(`Loaded ${Object.keys(COLLECTIONS).length} collections from ${DOMAIN}`);
+
+function col(handle) {
+  const c = COLLECTIONS[handle];
+  if (!c) {
+    console.warn(`  ⚠ no collection with handle "${handle}" — skipping menu item`);
+    return null;
+  }
+  return { type: "COLLECTION", resourceId: c.id, title: c.title };
+}
+
+// Build a list of COLLECTION items, dropping any handles that didn't resolve.
+function items(...handles) {
+  return handles.map(col).filter(Boolean);
+}
+
+// 2-level hierarchy: L1 groups, each with L2 collection items
 const MENU_ITEMS = [
   {
     title: "Electrical Distribution",
     type: "HTTP",
     url: "/collections/all",
-    items: [
-      col("breakers-panels"),
-      col("transformers"),
-      col("industrial-controls"),
-      col("motors-motor-controls"),
-    ],
+    items: items("breakers-panels", "transformers", "industrial-controls", "motors-motor-controls"),
   },
   {
     title: "Wiring & Infrastructure",
     type: "HTTP",
     url: "/collections/all",
-    items: [
-      col("wire-cable"),
-      col("conduit-fittings"),
-      col("cable-management"),
-      col("grounding-bonding"),
-      col("enclosures-boxes"),
-    ],
+    items: items("wire-cable", "conduit-fittings", "cable-management", "grounding-bonding", "enclosures-boxes"),
   },
   {
     title: "Devices & Controls",
     type: "HTTP",
     url: "/collections/all",
-    items: [
-      col("switches-receptacles"),
-      col("low-voltage-communications"),
-    ],
+    items: items("switches-receptacles", "low-voltage-communications"),
   },
-  {
-    title: "Lighting",
-    type: "COLLECTION",
-    resourceId: COLLECTIONS["lighting-fixtures"].id,
-    items: [],
-  },
+  ...(COLLECTIONS["lighting-fixtures"]
+    ? [{
+        title: "Lighting",
+        type: "COLLECTION",
+        resourceId: COLLECTIONS["lighting-fixtures"].id,
+        items: [],
+      }]
+    : []),
   {
     title: "Tools & Safety",
     type: "HTTP",
     url: "/collections/all",
-    items: [
-      col("tools-safety"),
-      col("test-measurement"),
-    ],
+    items: items("tools-safety", "test-measurement"),
   },
 ];
 

@@ -17,10 +17,13 @@ const SCOPES = [
   "read_inventory", "write_inventory",
 ].join(",");
 
+// Legacy interactive OAuth (authorization code grant) to mint an Admin token.
+// The app now prefers the client credentials grant (see lib/shopify/admin-token.ts),
+// so this route is only a fallback. Uses the custom app's API key/secret.
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const shop = url.searchParams.get("shop") ?? "makeswift-b2b-demo.myshopify.com";
-  const clientId = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID!;
+  const shop = url.searchParams.get("shop") ?? process.env.SHOPIFY_STORE_DOMAIN!;
+  const clientId = process.env.SHOPIFY_API_KEY!;
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/shopify/callback`;
 
   const state = randomBytes(16).toString("hex");

@@ -147,15 +147,15 @@ const getLocationContext = cache(async (companyLocationId: string): Promise<Loca
   };
 });
 
-/** Company-contact id for the signed-in customer. Matches the quotes flow (Admin API 2025-04). */
+/** Company-contact id for the signed-in customer. Matches the quotes flow (Admin API 2026-07). */
 const getCompanyContactId = cache(async (customerId: string): Promise<string | undefined> => {
-  const data = await adminQuery<{ customer: { companyContacts: { edges: Array<{ node: { id: string } }> } } | null }>(
+  const data = await adminQuery<{ customer: { companyContactProfiles: Array<{ id: string }> } | null }>(
     `query GetContactId($customerId: ID!) {
-      customer(id: $customerId) { companyContacts(first: 1) { edges { node { id } } } }
+      customer(id: $customerId) { companyContactProfiles { id } }
     }`,
     { customerId },
   ).catch(() => ({ customer: null }));
-  return data.customer?.companyContacts?.edges?.[0]?.node?.id;
+  return data.customer?.companyContactProfiles?.[0]?.id;
 });
 
 /** Read the storefront cart (B2B-contextual prices) as express line items. */

@@ -27,15 +27,15 @@ export async function POST(req: Request) {
   // Get companyContactId for purchasing entity
   let companyContactId: string | undefined;
   if (session.companyId && session.customerId) {
-    const data = await adminQuery<{ customer: { companyContacts: { edges: Array<{ node: { id: string } }> } } | null }>(
+    const data = await adminQuery<{ customer: { companyContactProfiles: Array<{ id: string }> } | null }>(
       `query GetContactId($customerId: ID!) {
         customer(id: $customerId) {
-          companyContacts(first: 1) { edges { node { id } } }
+          companyContactProfiles { id }
         }
       }`,
       { customerId: session.customerId },
     ).catch(() => ({ customer: null }));
-    companyContactId = data.customer?.companyContacts?.edges?.[0]?.node?.id;
+    companyContactId = data.customer?.companyContactProfiles?.[0]?.id;
   }
 
   const quote = await createQuote({

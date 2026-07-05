@@ -12,18 +12,16 @@
  */
 
 import "dotenv/config";
+import { getAdminToken } from "../lib/shopify/admin-token";
 
 // ─── SECTION A — Boilerplate ──────────────────────────────────────────────────
 
-const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? "makeswift-b2b-demo.myshopify.com";
-const ADMIN_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN ?? "";
-const API_VERSION = "2025-04";
+const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? "headless-b2b-demo.myshopify.com";
+const API_VERSION = "2026-07";
 const ENDPOINT = `https://${STORE_DOMAIN}/admin/api/${API_VERSION}/graphql.json`;
 
-if (!ADMIN_TOKEN) {
-  console.error("❌ SHOPIFY_ADMIN_API_TOKEN is not set. Copy .env.example to .env.local and fill it in.");
-  process.exit(1);
-}
+// Admin token via the client credentials grant (SHOPIFY_API_KEY + SHOPIFY_API_SECRET).
+const ADMIN_TOKEN = await getAdminToken();
 
 async function graphql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
   const res = await fetch(ENDPOINT, {
@@ -39,7 +37,7 @@ async function graphql<T>(query: string, variables?: Record<string, unknown>): P
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
-const REST_URL = `https://${STORE_DOMAIN}/admin/api/2025-04/orders.json`;
+const REST_URL = `https://${STORE_DOMAIN}/admin/api/${API_VERSION}/orders.json`;
 async function restOrder(body: unknown) {
   const r = await fetch(REST_URL, { method: "POST", headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": ADMIN_TOKEN }, body: JSON.stringify(body) });
   if (!r.ok) { console.warn("  REST order failed:", (await r.text()).slice(0, 200)); return null; }
@@ -1232,7 +1230,7 @@ async function createCompanies(prodResults: ProductResult[]): Promise<CompanyRes
       }
     );
 
-    let priceListId = plData.priceListCreate.priceList?.id;
+    const priceListId = plData.priceListCreate.priceList?.id;
     if (!priceListId) {
       console.warn(`    ⚠ PriceList for ${company.name}: ${plData.priceListCreate.userErrors.map(e => e.message).join(", ")}`);
     } else {

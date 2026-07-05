@@ -51,11 +51,11 @@ export async function GET() {
 
   // B2B contacts (B2B plan only)
   try {
-    const b2b = await adminQuery<{ customer: { companyContacts: { edges: Array<{ node: { id: string; company: { id: string; name: string } } }> } } | null }>(
-      `query($id: ID!) { customer(id: $id) { companyContacts(first: 5) { edges { node { id company { id name } } } } } }`,
+    const b2b = await adminQuery<{ customer: { companyContactProfiles: Array<{ id: string; company: { id: string; name: string } }> } | null }>(
+      `query($id: ID!) { customer(id: $id) { companyContactProfiles { id company { id name } } } }`,
       { id: gid }
     );
-    result.companyContacts = b2b.customer?.companyContacts?.edges?.map(e => e.node) ?? [];
+    result.companyContacts = b2b.customer?.companyContactProfiles ?? [];
   } catch (e) {
     result.companyContactsError = String(e);
   }
