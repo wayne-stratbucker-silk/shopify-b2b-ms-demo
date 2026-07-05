@@ -211,7 +211,8 @@ export function buildSession(customer: CustomerInfo): Session {
   const contact = customer.companyContacts[0];
   const firstAssignment = contact?.roleAssignments[0];
   const roleName = firstAssignment?.role?.name?.toLowerCase() ?? "buyer";
-  const role: "admin" | "buyer" = roleName === "admin" ? "admin" : "buyer";
+  // Default B2B roles are named e.g. "Location admin" / "Ordering only".
+  const role: "admin" | "buyer" = /admin/i.test(roleName) ? "admin" : "buyer";
 
   const displayName = `${customer.firstName} ${customer.lastName}`.trim();
 

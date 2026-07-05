@@ -202,16 +202,19 @@ function buildDraftInput(
       originalUnitPrice: l.originalUnitPrice,
       title: l.title,
     })),
-    customerId: session.customerId,
-    purchasingEntity: session.companyLocationId
+    // 2026-07: draftOrderCreate rejects sending both customer and
+    // purchasing_entity — use purchasingEntity for B2B, else customerId.
+    ...(session.companyLocationId
       ? {
-          purchasingCompany: {
-            companyId: session.companyId,
-            companyLocationId: session.companyLocationId,
-            companyContactId: contactId,
+          purchasingEntity: {
+            purchasingCompany: {
+              companyId: session.companyId,
+              companyLocationId: session.companyLocationId,
+              companyContactId: contactId,
+            },
           },
         }
-      : undefined,
+      : { customerId: session.customerId }),
     poNumber: poNumber || undefined,
     shippingAddress: ctx.shipping,
     billingAddress: ctx.billing,

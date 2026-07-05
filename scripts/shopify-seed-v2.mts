@@ -1156,8 +1156,10 @@ async function createCompanies(prodResults: ProductResult[]): Promise<CompanyRes
     );
 
     const roleEdges = rolesData.company?.contactRoles.edges ?? [];
-    const adminRoleId = roleEdges.find(e => e.node.name.toLowerCase() === "admin")?.node.id ?? "";
-    const buyerRoleId = roleEdges.find(e => e.node.name.toLowerCase() === "buyer")?.node.id ?? "";
+    // Default B2B role names vary by store (e.g. "Location admin" / "Ordering only"),
+    // so match by intent rather than an exact "admin"/"buyer" string.
+    const adminRoleId = roleEdges.find(e => /admin/i.test(e.node.name))?.node.id ?? roleEdges[0]?.node.id ?? "";
+    const buyerRoleId = roleEdges.find(e => /order|buyer/i.test(e.node.name))?.node.id ?? adminRoleId;
 
     // 6. Assign roles to all contacts
     for (let i = 0; i < contactIds.length; i++) {
@@ -1377,7 +1379,8 @@ async function createQuotes(companies: CompanyResult[], prods: ProductResult[]):
         {
           input: {
             lineItems,
-            customerId: c.mainCustomerId,
+            // 2026-07: draftOrderCreate rejects sending both customer and
+            // purchasing_entity — B2B quotes use purchasingEntity only.
             purchasingEntity: {
               purchasingCompany: {
                 companyId: c.companyId,
