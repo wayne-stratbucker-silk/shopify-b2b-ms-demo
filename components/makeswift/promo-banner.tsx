@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { runtime } from "@/lib/makeswift/runtime";
 import { Style, TextInput, RichText, Select, Image, Checkbox, Group, Link } from "@makeswift/runtime/controls";
 import { MSImage, toUrl } from "@/components/makeswift/ms-image";
+import { AltTextNotice } from "@/components/makeswift/builder-notice";
+import { isAltMissing } from "@/lib/seo-audit";
 import { ctaClass, type CtaStyle } from "@/lib/makeswift/cta-class";
 import { linkProps, type MSLink } from "@/lib/makeswift/link";
 import { EditableRegion } from "@/lib/makeswift/editable";
@@ -19,7 +21,7 @@ function PromoBanner(props: any) {
     eyebrowRt: eyebrow, headingRt: heading, bodyRt: body,
     buttons,
     priceBefore, priceAfter, skuLabel, badgeText,
-    mediaType, mediaImage, mediaAlt, mediaVideoUrl, mediaVideoLoop,
+    mediaType, mediaImage, mediaAlt, mediaDecorative, mediaVideoUrl, mediaVideoLoop,
     mediaVideoPoster,
     className,
   } = props as {
@@ -41,6 +43,7 @@ function PromoBanner(props: any) {
     mediaType?: MediaType;
     mediaImage?: unknown;
     mediaAlt?: string;
+    mediaDecorative?: boolean;
     mediaVideoUrl?: string;
     mediaVideoLoop?: boolean;
     mediaVideoPoster?: unknown;
@@ -64,10 +67,18 @@ function PromoBanner(props: any) {
           ? "video"
           : "color";
   const hasPrice = !!(priceAfter || priceBefore);
+  const decorativeImage = mediaDecorative === true;
+  const imgAlt = decorativeImage ? "" : (mediaAlt?.trim() || "");
+  // Builder-only: image set on the media panel but no alt text and not decorative.
+  const altIssues =
+    effectiveMediaType === "image" && isAltMissing(mediaImage, mediaAlt, decorativeImage)
+      ? ["Image"]
+      : [];
 
   return (
     <section className={className ?? ""}>
       <div className="container">
+        <AltTextNotice items={altIssues} />
         <div className="card acme-promo-2col">
           {/* ── Copy ── */}
           <div className="acme-promo-copy">
@@ -107,7 +118,7 @@ function PromoBanner(props: any) {
             {effectiveMediaType === "image" && mediaImageUrl && (
               <MSImage
                 src={mediaImageUrl}
-                alt={mediaAlt ?? ""}
+                alt={imgAlt}
                 sizes="(max-width:768px) 100vw, 40vw"
                 quality={72}
                 style={{ position: "absolute", inset: 0 }}
@@ -187,6 +198,7 @@ runtime.registerComponent(PromoBanner, {
     }),
     mediaImage: Image({ label: "Promo image" }),
     mediaAlt: TextInput({ label: "Image alt text (accessibility)", defaultValue: "" }),
+    mediaDecorative: Checkbox({ label: "Decorative image (no alt needed)", defaultValue: false }),
     mediaVideoUrl: TextInput({ label: "Video URL (.mp4 / .webm)" }),
     mediaVideoLoop: Checkbox({ label: "Loop video", defaultValue: true }),
     mediaVideoPoster: Image({ label: "Video poster frame" }),

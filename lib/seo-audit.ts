@@ -41,3 +41,28 @@ export function auditDocument(doc: Document): SeoIssue[] {
 
   return issues;
 }
+
+// The Makeswift Image control can return a URL string or an `{ url, dimensions }`
+// object depending on how the value was saved. Normalize to a URL string — a
+// pure local copy of the toUrl() shape used across the image components, kept
+// here so this module stays React/DOM-free and unit-friendly.
+function imageUrl(src: unknown): string | undefined {
+  if (!src) return undefined;
+  if (typeof src === "string") return src.trim() || undefined;
+  if (typeof src === "object" && src !== null && "url" in src) {
+    const url = (src as { url?: unknown }).url;
+    return typeof url === "string" && url.trim() ? url : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * True when a content image needs alt text but has none: a real image is set, it
+ * is not flagged decorative, and the alt is blank/whitespace. Binary by design —
+ * the builder-only <AltTextNotice> renders whatever this returns.
+ */
+export function isAltMissing(src: unknown, alt?: string, decorative?: boolean): boolean {
+  if (decorative) return false;
+  if (!imageUrl(src)) return false;
+  return !alt || alt.trim() === "";
+}

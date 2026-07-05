@@ -6,6 +6,8 @@ import {
   Style, TextInput, Checkbox, Select, Number, Image, List, Shape, Link,
 } from "@makeswift/runtime/controls";
 import { MSImage, toUrl } from "@/components/makeswift/ms-image";
+import { AltTextNotice } from "@/components/makeswift/builder-notice";
+import { isAltMissing } from "@/lib/seo-audit";
 import { ctaClass, CTA_STYLE_OPTIONS, type CtaStyle } from "@/lib/makeswift/cta-class";
 import { linkProps, type MSLink } from "@/lib/makeswift/link";
 
@@ -30,6 +32,8 @@ interface SlideData {
   stat4num?: string; stat4label?: string;
   mediaType?: MediaType;
   mediaImage?: unknown;
+  mediaImageAlt?: string;
+  mediaImageDecorative?: boolean;
   mediaVideoUrl?: string;
   mediaVideoLoop?: boolean;
   mediaVideoPoster?: unknown;
@@ -96,7 +100,7 @@ function SlideContent({ slide, priority }: { slide: SlideData; priority: boolean
           {mediaType === "image" && mediaImage && (
             <MSImage
               src={mediaImage}
-              alt={slide.heading ?? ""}
+              alt={slide.mediaImageDecorative ? "" : (slide.mediaImageAlt?.trim() || slide.heading || "")}
               priority={priority}
               sizes="(max-width: 768px) 100vw, 55vw"
               quality={75}
@@ -144,6 +148,10 @@ function HeroBanner({
 }) {
   const allSlides: SlideData[] = slides ?? [];
   const slideCount = allSlides.length;
+  // Builder-only: which authored slides have an image set but no dedicated alt.
+  const altIssues = allSlides
+    .map((s, i) => (isAltMissing(s.mediaImage, s.mediaImageAlt, s.mediaImageDecorative) ? `Slide ${i + 1}` : null))
+    .filter((x): x is string => x !== null);
   const [current, setCurrent] = useState(0);
   // Track the slide we're transitioning from so we can crossfade between the
   // two during the brief transition window.
@@ -271,6 +279,7 @@ function HeroBanner({
   return (
     <section className={`hero ${className ?? ""}`}>
       <div className="container">
+        <AltTextNotice items={altIssues} />
         <div
           className="hero-banner-stage"
           {...(isCarousel
@@ -395,6 +404,8 @@ const SLIDE_SHAPE = Shape({
       defaultValue: "none",
     }),
     mediaImage: Image({ label: "Image", format: Image.Format.URL }),
+    mediaImageAlt: TextInput({ label: "Image alt text (accessibility)", defaultValue: "" }),
+    mediaImageDecorative: Checkbox({ label: "Decorative image (no alt needed)", defaultValue: false }),
     mediaVideoUrl: TextInput({ label: "Video URL (.mp4 / .webm)" }),
     mediaVideoLoop: Checkbox({ label: "Loop video", defaultValue: true }),
     mediaVideoPoster: Image({ label: "Video poster (first frame)", format: Image.Format.URL }),

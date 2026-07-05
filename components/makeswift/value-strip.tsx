@@ -2,8 +2,10 @@
 
 import type { ReactNode } from "react";
 import { runtime } from "@/lib/makeswift/runtime";
-import { Style, TextInput, RichText, Image, Select, Color, Group, Number as MSNumber } from "@makeswift/runtime/controls";
+import { Style, TextInput, RichText, Image, Select, Color, Group, Number as MSNumber, Checkbox } from "@makeswift/runtime/controls";
 import { toUrl } from "@/components/makeswift/ms-image";
+import { AltTextNotice } from "@/components/makeswift/builder-notice";
+import { isAltMissing } from "@/lib/seo-audit";
 import { EditableRegion } from "@/lib/makeswift/editable";
 import NextImage from "next/image";
 
@@ -11,6 +13,10 @@ type Layout = "horizontal" | "vertical";
 
 interface SlotMedia {
   image?: unknown;
+  imageAlt?: string;
+  // Icons are decorative by default (a text label sits beside them). Authors can
+  // uncheck this when the icon image carries meaning, which then requires alt.
+  decorative?: boolean;
   icon?: string;
 }
 
@@ -50,10 +56,20 @@ function ValueStrip({
   const count = Math.min(Math.max(parseInt(visibleCount ?? "4", 10) || 4, 1), 4);
   const slots = allSlots.slice(0, count);
   const safeIcon = Math.min(Math.max(iconSize, 16), 96);
+  // Builder-only: icons are decorative by default, so this only fires when an
+  // author unchecks "Decorative" on an item and leaves the alt text blank.
+  const altIssues = slots
+    .map((slot, i) =>
+      isAltMissing(slot.media?.image, slot.media?.imageAlt, slot.media?.decorative !== false)
+        ? `Item ${i + 1}`
+        : null,
+    )
+    .filter((x): x is string => x !== null);
 
   return (
     <div className={className ?? ""}>
       <div className="container">
+        <AltTextNotice items={altIssues} />
         {/* Items are direct children of .value-strip so CSS grid + borders apply correctly */}
         <div
           className={`value-strip acme-value-strip acme-value-strip--${layout}`}
@@ -66,6 +82,10 @@ function ValueStrip({
           {slots.map((slot, i) => {
             const imageUrl = toUrl(slot.media?.image);
             const icon = slot.media?.icon;
+            // Decorative by default → alt="". Only carries an accessible name
+            // when the author opts the icon out of "decorative" and provides alt.
+            const decorative = slot.media?.decorative !== false;
+            const iconAlt = decorative ? "" : (slot.media?.imageAlt?.trim() || "");
             return (
               <div
                 key={i}
@@ -83,7 +103,7 @@ function ValueStrip({
                   >
                     <NextImage
                       src={imageUrl}
-                      alt=""
+                      alt={iconAlt}
                       fill
                       sizes={`${safeIcon * 2}px`}
                       style={{ objectFit: "contain" }}
@@ -122,6 +142,10 @@ const itemMediaGroup = (label: string, defaultIcon: string) =>
     preferredLayout: Group.Layout.Popover,
     props: {
       image: Image({ label: "Icon image (overrides emoji)", format: Image.Format.URL }),
+      // Icons sit beside a text label, so they're decorative by default (alt="").
+      // Uncheck when the icon image conveys meaning on its own, then fill alt text.
+      decorative: Checkbox({ label: "Decorative icon (no alt needed)", defaultValue: true }),
+      imageAlt: TextInput({ label: "Icon alt text (if not decorative)", defaultValue: "" }),
       icon: TextInput({ label: "Emoji icon (fallback)", defaultValue: defaultIcon }),
     },
   });
