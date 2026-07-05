@@ -33,3 +33,4 @@ import "@/components/makeswift/plp-interstitial";
 import "@/components/makeswift/not-found-page";
 import "@/components/makeswift/seo-page-auditor";
 import "@/components/makeswift/role-scope";
+import "@/components/makeswift/page-content-region";

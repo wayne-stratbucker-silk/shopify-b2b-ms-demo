@@ -34,6 +34,7 @@ import "@/components/makeswift/pdp-trust-badges";
 import "@/components/makeswift/pdp-freight-note";
 import "@/components/makeswift/auth-marketing-panel";
 import "@/components/makeswift/not-found-page";
+import "@/components/makeswift/page-content-region";
 
 export function MakeswiftProvider({
   children,
