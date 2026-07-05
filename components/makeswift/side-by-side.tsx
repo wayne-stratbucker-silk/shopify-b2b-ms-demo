@@ -2,7 +2,9 @@
 
 import type { ReactNode } from "react";
 import { runtime } from "@/lib/makeswift/runtime";
-import { Style, TextInput, RichText, Select, Image, Group } from "@makeswift/runtime/controls";
+import { Style, TextInput, RichText, Select, Image, Group, Checkbox } from "@makeswift/runtime/controls";
+import { AltTextNotice } from "@/components/makeswift/builder-notice";
+import { isAltMissing } from "@/lib/seo-audit";
 import { EditableRegion } from "@/lib/makeswift/editable";
 
 type ImagePosition = "left" | "right";
@@ -33,6 +35,8 @@ interface SideBySideProps {
   className?: string;
   image?: unknown;
   imageMeta?: string;
+  imageAlt?: string;
+  decorative?: boolean;
   imagePosition?: ImagePosition;
   align?: Align;
   valign?: Valign;
@@ -54,6 +58,8 @@ function SideBySide({
   className,
   image,
   imageMeta,
+  imageAlt,
+  decorative,
   imagePosition = "left",
   align = "left",
   valign = "center",
@@ -63,6 +69,12 @@ function SideBySide({
   buttons,
 }: SideBySideProps) {
   const imageUrl = toUrl(image);
+  const decorativeImage = decorative === true;
+  // Prefer the dedicated alt field; fall back to the caption so pages authored
+  // before the alt/caption split don't regress. Decorative → empty alt.
+  const effectiveAlt = imageAlt?.trim() || imageMeta?.trim() || "";
+  const imgAlt = decorativeImage ? "" : effectiveAlt;
+  const altIssues = isAltMissing(image, effectiveAlt, decorativeImage) ? ["Image"] : [];
   const {
     primaryCtaLabel,
     primaryCtaHref,
@@ -75,11 +87,12 @@ function SideBySide({
   return (
     <section className={`sbs-section ${className ?? ""}`}>
       <div className="container">
+        <AltTextNotice items={altIssues} />
         <div className={`sbs${imagePosition === "right" ? " image-right" : ""}`}>
           <div className="sbs-image">
             {imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageUrl} alt={imageMeta ?? ""} loading="lazy" decoding="async" />
+              <img src={imageUrl} alt={imgAlt} loading="lazy" decoding="async" />
             ) : (
               <div className="sbs-image-placeholder" aria-hidden="true">
                 <span>IMAGE / UPLOAD IN PANEL</span>
@@ -125,6 +138,13 @@ runtime.registerComponent(SideBySide, {
       label: "Image caption (optional)",
       defaultValue: "FIG. 01 / WAREHOUSE-RETROFIT",
     }),
+    // Dedicated accessible name, kept separate from the visible caption. Falls
+    // back to the caption at render time when left blank (back-compat).
+    imageAlt: TextInput({
+      label: "Image alt text (accessibility)",
+      defaultValue: "",
+    }),
+    decorative: Checkbox({ label: "Decorative image (no alt needed)", defaultValue: false }),
     imagePosition: Select({
       label: "Image position",
       options: [
