@@ -59,7 +59,7 @@ interface ShopifyProduct {
       };
     }>;
   };
-  metafields: Array<{ key: string; value: string } | null>;
+  metafield: { value: string } | null;
 }
 
 async function fetchAllProducts(): Promise<ShopifyProduct[]> {
@@ -94,9 +94,7 @@ async function fetchAllProducts(): Promise<ShopifyProduct[]> {
                         }
                       }
                     }
-                    metafields(identifiers: [{ namespace: "custom", key: "uom" }]) {
-                      key value
-                    }
+                    metafield(namespace: "custom", key: "uom") { value }
                   }
                 }
                 pageInfo { hasNextPage }
@@ -136,7 +134,7 @@ function toAlgoliaRecord(product: ShopifyProduct): AlgoliaRecord {
     (sum, e) => sum + (e.node.inventoryQuantity ?? 0),
     0
   );
-  const uom = (product.metafields ?? []).filter(Boolean).find(m => m!.key === "uom")?.value ?? "EA";
+  const uom = product.metafield?.value ?? "EA";
 
   return {
     objectID: product.id,

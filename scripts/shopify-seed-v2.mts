@@ -1184,17 +1184,19 @@ async function createCompanies(prodResults: ProductResult[]): Promise<CompanyRes
       await sleep(200);
     }
 
-    // 7. Set company metafield for customer SKUs
-    await graphql<{ companyUpdate: { company: { id: string } | null; userErrors: Array<{ message: string }> } }>(
-      `mutation CompanyUpdateMeta($id: ID!, $mf: [MetafieldInput!]!) {
-        companyUpdate(companyId: $id, input: { metafields: $mf }) {
-          company { id }
+    // 7. Set company metafield for customer SKUs.
+    // 2026-07: CompanyInput no longer accepts `metafields` — use metafieldsSet
+    // with the company GID as ownerId.
+    await graphql<{ metafieldsSet: { userErrors: Array<{ message: string }> } }>(
+      `mutation SetCompanySkus($mf: [MetafieldsSetInput!]!) {
+        metafieldsSet(metafields: $mf) {
+          metafields { id }
           userErrors { message }
         }
       }`,
       {
-        id: companyId,
         mf: [{
+          ownerId: companyId,
           namespace: "b2b",
           key: "customer_skus",
           value: JSON.stringify(company.customerSkuMap),
