@@ -29,6 +29,17 @@ const TOKEN_RE = /\[\[\s*makeswift-region\s*:\s*([A-Za-z0-9_-]+)\s*\]\]/gi;
 // other prose are left untouched.
 const WRAPPED_TOKEN_RE = /<p[^>]*>\s*(\[\[\s*makeswift-region\s*:\s*[A-Za-z0-9_-]+\s*\]\])\s*<\/p>/gi;
 
+// Spans covered by <pre>/<code>. Tokens inside these are teaching examples
+// (an explainer showing the `[[makeswift-region:id]]` syntax) and must render
+// as literal text, never become live regions.
+function protectedRanges(html: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  const re = /<(pre|code)\b[^>]*>[\s\S]*?<\/\1>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) ranges.push([m.index, m.index + m[0].length]);
+  return ranges;
+}
+
 function regionSnapshotId(regionId: string): string {
   return `acme-b2b-region-${regionId}`;
 }
@@ -64,6 +75,8 @@ function HtmlChunk({ html }: { html: string }) {
  */
 export function ContentWithRegions({ html }: { html: string }) {
   const normalized = html.replace(WRAPPED_TOKEN_RE, "$1");
+  const ranges = protectedRanges(normalized);
+  const isProtected = (idx: number) => ranges.some(([s, e]) => idx >= s && idx < e);
 
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -71,6 +84,8 @@ export function ContentWithRegions({ html }: { html: string }) {
   TOKEN_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = TOKEN_RE.exec(normalized)) !== null) {
+    // Leave tokens inside code samples as literal text.
+    if (isProtected(match.index)) continue;
     const before = normalized.slice(lastIndex, match.index);
     if (before.trim()) parts.push(<HtmlChunk key={`h${i}`} html={before} />);
     parts.push(<MakeswiftRegion key={`r${i}`} regionId={match[1].trim()} />);

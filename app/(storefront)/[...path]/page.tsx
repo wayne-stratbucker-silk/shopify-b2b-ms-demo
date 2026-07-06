@@ -18,7 +18,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props) {
   const { path } = await params;
-  const page = await getContentPage(path.join("/")).catch(() => null);
+  const page = await getContentPage(path.join("/").replace(/^pages\//, "")).catch(() => null);
   if (!page) return {};
   return {
     title: page.seoTitle || page.title,
@@ -36,10 +36,11 @@ export default async function CatchAllPage({ params }: Props) {
     if (snapshot) return <Page snapshot={snapshot} />;
   } catch { /* fall through */ }
 
-  // 2. Try a Shopify-authored content Page (Online Store → Pages). The body is
-  //    sanitized Shopify HTML; any `[[makeswift-region:<id>]]` tokens in it
-  //    become live, editable Makeswift content regions in place.
-  const contentPage = await getContentPage(slug).catch(() => null);
+  // 2. Try a Shopify-authored content Page (Online Store → Pages), resolving
+  //    both the bare handle and Shopify's native /pages/<handle> path. The body
+  //    is sanitized Shopify HTML; `[[makeswift-region:<id>]]` tokens (outside
+  //    code samples) become live, editable Makeswift content regions in place.
+  const contentPage = await getContentPage(slug.replace(/^pages\//, "")).catch(() => null);
   if (contentPage) {
     return (
       <div className="container section" style={{ maxWidth: 760 }}>
