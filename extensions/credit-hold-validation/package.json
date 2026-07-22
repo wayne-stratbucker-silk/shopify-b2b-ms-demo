@@ -1,0 +1,12 @@
+{
+  "name": "credit-hold-validation",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Shopify Function (cart.validations.generate.run) that blocks B2B checkout on credit hold.",
+  "scripts": {
+    "typegen": "shopify app function typegen",
+    "build": "shopify app function build",
+    "preview": "shopify app function run"
+  }
+}

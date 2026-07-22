@@ -18,6 +18,10 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      // Shopify Functions extensions ship their own toolchain (Javy + CLI
+      // codegen) and reference generated types that don't exist until
+      // `shopify app function typegen` runs — not part of the Next.js lint.
+      "extensions/**",
     ],
   },
 ];
