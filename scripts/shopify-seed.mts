@@ -620,8 +620,7 @@ async function main() {
     console.log("\nNext steps:");
     console.log("  1. In Shopify Admin, verify products are published to the Online Store channel");
     console.log("  2. Send account invite emails to B2B contacts via Shopify Admin");
-    console.log("  3. Run: npm run algolia-sync to index products in Algolia");
-    console.log("  4. Set up webhooks: npm run register-webhooks");
+    console.log("  3. Set up webhooks: npm run register-webhooks");
   } catch (err) {
     console.error("\n❌ Seeding failed:", err);
     process.exit(1);

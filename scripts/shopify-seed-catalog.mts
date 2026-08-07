@@ -120,7 +120,7 @@ async function main() {
   const colIds = await createCollections();
   const locationId = await getLocationId();
   await createProducts(colIds, locationId);
-  console.log("\n✅ Done! Run npm run algolia-sync next.\n");
+  console.log("\n✅ Done!\n");
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
