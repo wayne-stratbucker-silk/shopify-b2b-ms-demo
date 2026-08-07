@@ -33,7 +33,7 @@ export interface CompanyFinancials {
 
 export interface ErpAdapter {
   /** Identifier of the underlying ERP — useful for logging and feature flags. */
-  readonly id: "mock" | "netsuite" | "sap" | "quickbooks";
+  readonly id: "mock" | "metafield" | "netsuite" | "sap" | "quickbooks";
 
   /**
    * Fetch a company's financials. Returns null when the ERP is unreachable
