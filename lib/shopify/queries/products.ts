@@ -2,7 +2,7 @@ import { storefrontQuery, type BuyerContext } from "@/lib/shopify/storefront-cli
 import { adminQuery } from "@/lib/shopify/admin-client";
 import type { ShopifyProduct, ShopifyCollection } from "@/types";
 
-const PRODUCT_FIELDS = `
+export const PRODUCT_FIELDS = `
   id
   handle
   title
