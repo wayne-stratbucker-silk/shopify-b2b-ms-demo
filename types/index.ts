@@ -31,6 +31,8 @@ export interface Product {
   msrp?: number;
   uom: string;                // unit of measure from product metafield
   stockQty: number;
+  available?: boolean;        // Shopify availableForSale — purchasable even at qty 0
+                              // (continue-selling / untracked). Trust over stockQty.
   leadTime: string;
   leadTimeDays?: number;
   badges: BadgeKind[];

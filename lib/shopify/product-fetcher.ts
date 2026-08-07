@@ -34,6 +34,10 @@ export function mapProduct(shopifyProduct: ShopifyProduct, customerSku?: string)
     wasSalePrice: compareAtPrice > 0 ? compareAtPrice : undefined,
     uom: getMeta("uom") || "EA",
     stockQty: totalQty,
+    // Shopify's own purchasable signal — true even at qty 0 for continue-selling
+    // or untracked variants. The UI trusts this over stockQty so those don't
+    // read as "out of stock".
+    available: inStock,
     leadTime: getMeta("lead_time") || (inStock ? "In stock" : "Contact for availability"),
     leadTimeDays: inStock ? 1 : undefined,
     badges: [],

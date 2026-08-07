@@ -61,6 +61,7 @@ export function ProductCard({ product: p, listName, index }: ProductCardProps) {
             stockQty={p.stockQty}
             lowStockLevel={p.lowStockLevel}
             trackInventory={p.trackInventory}
+            available={p.available}
           />
         </div>
       </div>
