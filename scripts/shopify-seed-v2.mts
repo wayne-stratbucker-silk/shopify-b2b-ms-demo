@@ -1461,7 +1461,7 @@ async function main() {
   console.log("✓ Quotes created");
   await createLists(compResults, prodResults);
   console.log("✓ Lists created");
-  console.log("\n✅ Done! Run npm run algolia-sync next.\n");
+  console.log("\n✅ Done!\n");
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

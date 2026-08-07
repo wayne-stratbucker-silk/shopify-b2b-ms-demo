@@ -30,7 +30,6 @@ export async function POST(req: Request) {
         revalidateTag(`product:${handle}`);
         revalidateTag("products:featured");
       }
-      // Algolia sync: queue for background processing
       console.log(`[webhook] ${topic} handle=${handle}`);
       break;
     }

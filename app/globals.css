@@ -1120,7 +1120,6 @@ input::placeholder, textarea::placeholder {
    whole page down (CLS). The mobile scroll-collapse rule overrides this with
    min-height: 0 so the bar can still hide on scroll. */
 .aa-wrapper { width: 100%; min-height: 36px; position: relative; }
-.aa-Autocomplete { width: 100%; }
 /* Form — matches .search */
 .aa-Form {
   display: flex !important; align-items: center !important;
@@ -1132,9 +1131,6 @@ input::placeholder, textarea::placeholder {
 }
 .aa-Form:focus-within { border-color: var(--primary) !important; box-shadow: none !important; }
 /* Move submit button to the right */
-.aa-InputWrapperPrefix { order: 3 !important; padding: 0 !important; height: 100% !important; }
-.aa-InputWrapper { flex: 1 !important; order: 1 !important; padding: 0 !important; display: flex !important; align-items: center !important; height: 100% !important; }
-.aa-InputWrapperSuffix { display: none !important; }
 /* Input — matches .search-input */
 .aa-Input {
   flex: 1 !important; border: 0 !important; outline: 0 !important; box-shadow: none !important;
@@ -1171,7 +1167,6 @@ input::placeholder, textarea::placeholder {
   overflow: hidden !important; font-family: inherit !important; font-size: 13px !important;
 }
 .aa-PanelLayout { padding: 0 !important; max-height: 480px !important; overflow-y: auto !important; }
-.aa-SourceHeader { display: none !important; }
 .aa-List { padding: 0 !important; margin: 0 !important; list-style: none !important; }
 .aa-Item { border-bottom: 1px solid var(--line) !important; padding: 0 !important; cursor: pointer !important; }
 .aa-Item[aria-selected="true"],
@@ -1213,148 +1208,6 @@ input::placeholder, textarea::placeholder {
   .aa-Panel { width: min(100vw, 480px) !important; }
   .aa-PanelLayout { max-height: 55vh !important; }
   .aa-product-price { display: none; }
-}
-
-/* ─── Algolia detached trigger button (mobile header bar) ───
-   Below --aa-detached-media-query (max-width: 680px) Algolia renders a
-   `.aa-DetachedSearchButton` trigger in the header instead of the inline
-   `.aa-Form`. Style it to match the desktop search bar: 36px bordered,
-   rounded input look with a dark "Search" button (icon + label) on the right. */
-.aa-DetachedSearchButton {
-  display: flex !important;
-  align-items: center !important;
-  width: 100% !important;
-  height: 36px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: 1px solid var(--line-2) !important;
-  border-radius: var(--radius) !important;
-  background: var(--surface) !important;
-  color: var(--muted-2) !important;
-  font-family: inherit !important;
-  font-size: 13px !important;
-  cursor: pointer !important;
-  overflow: hidden !important;
-  box-shadow: none !important;
-}
-.aa-DetachedSearchButton:focus {
-  border-color: var(--primary) !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-/* Leading magnifier icon */
-.aa-DetachedSearchButtonIcon {
-  width: auto !important;
-  height: 100% !important;
-  padding: 0 0 0 12px !important;
-  color: var(--muted-2) !important;
-  flex-shrink: 0 !important;
-}
-.aa-DetachedSearchButtonIcon svg { width: 16px; height: 16px; }
-/* Placeholder / query text — matches the input treatment */
-.aa-DetachedSearchButtonPlaceholder,
-.aa-DetachedSearchButtonQuery {
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-  padding: 0 10px !important;
-  font-family: var(--font-geist-mono, monospace) !important;
-  font-size: 11px !important;
-  color: #626b76 !important;
-  text-align: left !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}
-.aa-DetachedSearchButtonQuery { color: var(--ink) !important; }
-/* Dark "Search" button affordance on the right — mirrors .aa-SubmitButton */
-.aa-DetachedSearchButton::after {
-  content: "Search";
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  align-self: stretch !important;
-  flex-shrink: 0 !important;
-  margin-left: auto !important;
-  padding: 0 18px !important;
-  background: var(--primary) !important;
-  color: #fff !important;
-  font-family: inherit !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-}
-
-/* ─── Algolia detached overlay (mobile full-screen search) ─── */
-.aa-DetachedOverlay {
-  background: rgba(0,0,0,.45) !important;
-}
-.aa-DetachedContainer {
-  background: var(--surface) !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  display: flex !important;
-  flex-direction: column !important;
-  max-height: 100dvh !important;
-}
-.aa-DetachedFormContainer {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  padding: 10px 14px !important;
-  border-bottom: 1px solid var(--line) !important;
-  /* Keep the form + × button above the panel layout so taps reach them.
-     The classic theme positions .aa-PanelLayout absolutely from top:0, which
-     otherwise overlays this row and swallows clicks on the cancel button. */
-  position: relative !important;
-  z-index: 1 !important;
-  flex-shrink: 0 !important;
-}
-/* Shrink the form to leave room for the × button */
-.aa-DetachedFormContainer .aa-Form { flex: 1 !important; min-width: 0 !important; }
-/* × close button — styled like the site's icon buttons */
-.aa-DetachedCancelButton {
-  flex-shrink: 0 !important;
-  width: 36px !important;
-  height: 36px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  background: none !important;
-  border: 1px solid var(--line-2) !important;
-  border-radius: var(--radius) !important;
-  cursor: pointer !important;
-  padding: 0 !important;
-  font-size: 0 !important;        /* hide "Cancel" text */
-  color: var(--ink) !important;
-  position: relative !important;  /* sit above the panel layout */
-  z-index: 2 !important;
-  pointer-events: auto !important;
-}
-.aa-DetachedCancelButton::before {
-  content: "✕";
-  font-size: 15px;
-  line-height: 1;
-  color: var(--ink);
-  pointer-events: none;           /* clicks fall through to the button */
-}
-/* Panel inside detached overlay: fill remaining height, no extra scroll */
-.aa-DetachedContainer .aa-Panel {
-  position: static !important;
-  width: 100% !important;
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  flex: 1 !important;
-}
-.aa-DetachedContainer .aa-PanelLayout {
-  /* Classic theme makes this `position: absolute; top:0; left:0; right:0`,
-     which overlays the form row and blocks the × cancel button. Put it back
-     into normal flow so it sits below the form container and is scrollable. */
-  position: static !important;
-  inset: auto !important;
-  max-height: none !important;
-  height: auto !important;
-  flex: 1 1 auto !important;
-  overflow-y: auto !important;
 }
 
 /* ─── Search blank-state help card ─── */
@@ -1637,9 +1490,9 @@ input::placeholder, textarea::placeholder {
 }
 .qow-card-secondary:hover { background: var(--surface-2); }
 
-/* Search — bar styled to match the global mobile site search (.aa-Form /
-   .aa-DetachedSearchButton): 36px tall, 1px var(--line-2) border, monospace
-   placeholder at 11px so the two patterns read as one. */
+/* Search — bar styled to match the global mobile site search (.aa-Form):
+   36px tall, 1px var(--line-2) border, monospace placeholder at 11px so the
+   two patterns read as one. */
 .qow-search-wrap { padding: 16px 16px 0; position: relative; }
 .qow-search-box {
   display: flex; align-items: center; gap: 0;
