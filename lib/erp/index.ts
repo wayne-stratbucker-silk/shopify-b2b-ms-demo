@@ -1,34 +1,35 @@
 // Server-side ERP integration point.
 //
-// The default adapter is a deterministic mock — swap by setting
-// process.env.ACME_ERP_ADAPTER to "netsuite" | "sap" | "quickbooks" once
-// those adapters are implemented. Until then this module always returns
-// the mock implementation so consumers have a stable shape to build UI
-// against.
+// The default adapter reads a company's credit/AR/terms from Shopify Company
+// metafields (see metafield-adapter.ts). Set process.env.ACME_ERP_ADAPTER to
+// "mock" for an offline/deterministic demo, or to "netsuite" | "sap" |
+// "quickbooks" once those real adapters are implemented.
 //
 // Callers must treat a null result as a soft failure — surface a warning
 // banner and allow Add-to-Cart, do NOT block the buyer.
 
 import { mockErpAdapter } from "./mock-adapter";
+import { metafieldErpAdapter } from "./metafield-adapter";
 import type { CompanyFinancials, ErpAdapter } from "./types";
 
 export type { CompanyFinancials, ErpAdapter } from "./types";
 
 function selectAdapter(): ErpAdapter {
-  const id = (process.env.ACME_ERP_ADAPTER ?? "mock").toLowerCase();
-  // Only the deterministic mock is implemented today. netsuite/sap/quickbooks
-  // are not wired yet (TODO(company-track): add real adapters once the ERP
-  // integration contract is signed). If one is configured we warn — so a
-  // misconfigured env is visible in logs — but still return the mock rather
-  // than crash, since the whole ERP path is a soft dependency (see
-  // getCompanyFinancials / the null-result contract above).
-  if (id !== "mock") {
-    console.warn(
-      `[erp] ACME_ERP_ADAPTER="${id}" is not implemented; falling back to the mock adapter. ` +
-        `Implement an adapter in lib/erp before configuring this.`,
-    );
-  }
-  return mockErpAdapter;
+  // Default to the Shopify-native metafield adapter (reads b2b.* Company
+  // metafields — seed with `npm run seed:credit`). `mock` stays available for
+  // tests/offline demos. netsuite/sap/quickbooks are not wired yet
+  // (TODO(company-track): add real adapters once the ERP contract is signed);
+  // an unknown value warns and falls back to the metafield adapter rather than
+  // crash, since the whole ERP path is a soft dependency (null → banner, never
+  // block the buyer).
+  const id = (process.env.ACME_ERP_ADAPTER ?? "metafield").toLowerCase();
+  if (id === "mock") return mockErpAdapter;
+  if (id === "metafield") return metafieldErpAdapter;
+  console.warn(
+    `[erp] ACME_ERP_ADAPTER="${id}" is not implemented; using the metafield adapter. ` +
+      `Implement an adapter in lib/erp before configuring this.`,
+  );
+  return metafieldErpAdapter;
 }
 
 let cached: ErpAdapter | null = null;
