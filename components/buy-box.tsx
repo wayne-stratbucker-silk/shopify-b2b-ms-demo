@@ -103,8 +103,12 @@ export function BuyBox({ product: p, isLoggedIn, variantId, forceOutOfStock = fa
     ? locationWarehouses.reduce((s, w) => s + w.qty, 0)
     : p.stockQty;
 
-  // forceOutOfStock lets variant selector signal OOS immediately (before warehouse data loads)
-  const isOutOfStock = forceOutOfStock || totalStockQty === 0;
+  // forceOutOfStock lets the variant selector signal OOS immediately (before
+  // warehouse data loads). Otherwise trust Shopify's availableForSale: a
+  // continue-selling / untracked product is purchasable even at qty 0. Fall
+  // back to quantity only when availability is unknown.
+  const isOutOfStock =
+    forceOutOfStock || p.available === false || (p.available == null && totalStockQty === 0);
 
   // Determine active tier
   const activeTierIdx = [...p.tiers]
@@ -269,6 +273,7 @@ export function BuyBox({ product: p, isLoggedIn, variantId, forceOutOfStock = fa
             stockQty={totalStockQty}
             lowStockLevel={p.lowStockLevel}
             trackInventory={p.trackInventory}
+            available={p.available}
           />
         </div>
         {freightNote ?? (

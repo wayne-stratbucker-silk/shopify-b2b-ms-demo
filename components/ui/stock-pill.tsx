@@ -6,6 +6,9 @@ interface StockPillProps {
   // Whether BC tracks inventory for this product. When false, we show
   // "Available" (no quantity semantics).
   trackInventory?: boolean;
+  // Shopify's availableForSale — purchasable even at qty 0 (continue-selling /
+  // untracked). When true and qty is 0/unknown, show "Available" not "Out of stock".
+  available?: boolean;
   // Show the numeric quantity inside the badge label. Defaults to true.
   showCount?: boolean;
   className?: string;
@@ -26,12 +29,19 @@ export function resolve(
   lowStockLevel?: number,
   trackInventory?: boolean,
   showCount = true,
+  available?: boolean,
 ): { label: string; tone: Tone } {
   const fmtQty = stockQty.toLocaleString("en-US");
 
   // No inventory tracking → always available (no qty semantics).
   if (trackInventory === false) return { label: "Available", tone: "green" };
-  if (stockQty <= 0) return { label: "Out of stock", tone: "red" };
+  if (stockQty <= 0) {
+    // Trust Shopify's purchasable signal over a 0/unknown quantity: a
+    // continue-selling or untracked variant is orderable even at 0 on hand.
+    return available
+      ? { label: "Available", tone: "green" }
+      : { label: "Out of stock", tone: "red" };
+  }
   if (lowStockLevel != null && lowStockLevel > 0 && stockQty <= lowStockLevel) {
     return {
       label: showCount ? `Low stock · ${fmtQty}` : "Low stock",
@@ -48,11 +58,12 @@ export function StockPill({
   stockQty,
   lowStockLevel,
   trackInventory,
+  available,
   showCount = true,
   className,
   style,
 }: StockPillProps) {
-  const { label, tone } = resolve(stockQty, lowStockLevel, trackInventory, showCount);
+  const { label, tone } = resolve(stockQty, lowStockLevel, trackInventory, showCount, available);
   const { fg } = TONES[tone];
   return (
     <span
