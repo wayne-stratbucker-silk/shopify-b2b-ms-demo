@@ -16,6 +16,7 @@
     "seed:orders:acme": "node --env-file=.env.local --import tsx/esm scripts/seed-orders-acme.mts",
     "seed:company-files": "node --env-file=.env.local --import tsx/esm scripts/create-company-file-metaobject.mts",
     "seed:reviews": "node --env-file=.env.local --import tsx/esm scripts/seed-product-reviews.mts",
+    "seed:inventory": "node --env-file=.env.local --import tsx/esm scripts/seed-inventory.mts",
     "publish:products": "node --env-file=.env.local --import tsx/esm scripts/publish-products.mts",
     "assign:roles": "node --env-file=.env.local --import tsx/esm scripts/assign-company-roles.mts",
     "seed:quotes": "node --env-file=.env.local --import tsx/esm scripts/seed-quotes.mts",
