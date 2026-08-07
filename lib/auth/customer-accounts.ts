@@ -207,8 +207,14 @@ export async function getCustomerWithCompany(customerId: string): Promise<Custom
   };
 }
 
-export function buildSession(customer: CustomerInfo): Session {
-  const contact = customer.companyContacts[0];
+export function buildSession(customer: CustomerInfo, preferredCompanyId?: string): Session {
+  // Default to the first company; when a specific company is requested (company
+  // switcher), use that contact instead so role/location/permissions are scoped
+  // to the chosen company.
+  const contact =
+    (preferredCompanyId
+      ? customer.companyContacts.find((c) => c.company?.id === preferredCompanyId)
+      : undefined) ?? customer.companyContacts[0];
   const firstAssignment = contact?.roleAssignments[0];
   const roleName = firstAssignment?.role?.name?.toLowerCase() ?? "buyer";
   // Default B2B roles are named e.g. "Location admin" / "Ordering only".
