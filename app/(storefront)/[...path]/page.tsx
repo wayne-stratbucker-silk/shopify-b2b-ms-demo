@@ -3,17 +3,17 @@ import Link from "next/link";
 import { Page } from "@makeswift/runtime/next";
 import { getSiteVersion } from "@makeswift/runtime/next/server";
 import { client } from "@/lib/makeswift/client";
-import { getCollectionMeta } from "@/lib/shopify/queries/products";
 import { getContentPage } from "@/lib/shopify/pages";
 import { ContentWithRegions } from "@/components/makeswift/content-regions";
-import { fetchCollectionPLP } from "@/lib/algolia/collection-products";
-import { FacetedPlp } from "@/components/faceted-plp";
+import { getCollectionPlp, parsePlpFilters, parsePlpSort } from "@/lib/shopify/queries/plp";
+import { ShopifyPlp } from "@/components/shopify-plp";
 import "@/components/makeswift/register";
 
 export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{ path: string[] }>;
+  searchParams: Promise<{ filter?: string | string[]; sort?: string | string[] }>;
 }
 
 export async function generateMetadata({ params }: Props) {
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: Props) {
   };
 }
 
-export default async function CatchAllPage({ params }: Props) {
+export default async function CatchAllPage({ params, searchParams }: Props) {
   const { path } = await params;
   const slug = path.join("/");
 
@@ -50,15 +50,18 @@ export default async function CatchAllPage({ params }: Props) {
     );
   }
 
-  // 3. Try as a collection handle (strip "collections/" prefix if present)
+  // 3. Try as a collection handle (strip "collections/" prefix if present).
+  //    Products + facets come straight from the Storefront API — faceting and
+  //    sorting are driven by the URL query string (see components/shopify-plp).
   const collectionHandle = slug.replace(/^collections\//, "");
+  const sp = await searchParams;
+  const plp = await getCollectionPlp(collectionHandle, {
+    filters: parsePlpFilters(sp.filter),
+    sort: parsePlpSort(sp.sort),
+  }).catch(() => null);
 
-  const [meta, plp] = await Promise.all([
-    getCollectionMeta(collectionHandle).catch(() => null),
-    fetchCollectionPLP(collectionHandle).catch(() => null),
-  ]);
-
-  if (meta) {
+  if (plp) {
+    const meta = { title: plp.title ?? collectionHandle, description: plp.description };
     // Derive a readable parent name from the URL path when the collection is
     // nested (e.g. /electrical/wire-cable → parent = "Electrical").
     const parentSlug = path.length >= 2 ? path[0] : null;
@@ -91,14 +94,14 @@ export default async function CatchAllPage({ params }: Props) {
           </div>
         </div>
 
-        {/* Faceted product grid */}
-        <FacetedPlp
+        {/* Faceted product grid — Shopify-native facets + sort */}
+        <ShopifyPlp
           listName={meta.title}
-          filter={{ kind: "collection", collectionHandle }}
-          initialProducts={plp?.products ?? []}
-          initialFacets={plp?.facets}
-          initialFacetDefs={plp?.facetDefs}
-          initialNbHits={plp?.nbHits}
+          mode="collection"
+          products={plp.products}
+          facets={plp.facets}
+          totalCount={plp.pageInfo.hasNextPage ? undefined : plp.products.length}
+          sort={parsePlpSort(sp.sort)}
         />
       </div>
     );
