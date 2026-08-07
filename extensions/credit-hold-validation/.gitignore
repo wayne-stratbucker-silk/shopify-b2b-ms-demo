@@ -1,0 +1,4 @@
+# Shopify CLI build + codegen artifacts
+dist/
+generated/
+node_modules/

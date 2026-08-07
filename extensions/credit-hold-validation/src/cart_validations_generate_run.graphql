@@ -1,0 +1,40 @@
+# Input for the cart.validations.generate.run target.
+#
+# Reads the purchasing company's `b2b.credit_hold` metafield — the SAME metafield
+# the app already uses (see lib/b2b/credit.ts `readHoldOverride`). `credit_limit`
+# is optional and drives the per-order ceiling check.
+#
+# Access: the app that owns this function needs read access to these Company/
+# CompanyLocation metafields. See README.md → "Metafield access".
+query CartValidationsGenerateRunInput {
+  cart {
+    cost {
+      subtotalAmount {
+        amount
+      }
+    }
+    buyerIdentity {
+      purchasingCompany {
+        company {
+          id
+          name
+          creditHold: metafield(namespace: "b2b", key: "credit_hold") {
+            value
+          }
+          creditLimit: metafield(namespace: "b2b", key: "credit_limit") {
+            value
+          }
+        }
+        location {
+          id
+          creditHold: metafield(namespace: "b2b", key: "credit_hold") {
+            value
+          }
+        }
+      }
+    }
+  }
+  buyerJourney {
+    step
+  }
+}

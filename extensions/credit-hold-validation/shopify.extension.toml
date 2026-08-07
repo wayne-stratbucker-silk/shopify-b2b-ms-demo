@@ -1,0 +1,22 @@
+# Cart & Checkout Validation Function — blocks B2B checkout on credit hold.
+#
+# This is a Shopify Functions extension. It is NOT part of the Next.js app; it
+# compiles to Wasm and runs inside Shopify's checkout. Deploy it from a Shopify
+# app (see README.md) with `shopify app deploy`, then activate the validation.
+api_version = "2025-07"
+
+[[extensions]]
+name = "Credit hold validation"
+handle = "credit-hold-validation"
+type = "function"
+description = "Blocks B2B checkout when the purchasing company (or its location) is on credit hold, with an optional per-order credit-limit ceiling."
+
+  [[extensions.targeting]]
+  target = "cart.validations.generate.run"
+  input_query = "src/cart_validations_generate_run.graphql"
+  export = "cart_validations_generate_run"
+
+  [extensions.build]
+  # JS/TS functions are built by the Shopify CLI (Javy) — no custom command.
+  path = "dist/function.wasm"
+  watch = ["src/**/*.js", "src/**/*.graphql"]
