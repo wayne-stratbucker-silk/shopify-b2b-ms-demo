@@ -4,37 +4,13 @@ import { useState, useCallback, useRef, useEffect, KeyboardEvent } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
-import { normalizeHit, type RawConnectorHit } from "@/lib/algolia/connector-hit";
 import { formatLineName, type NameOptionPair } from "@/lib/format-line-name";
 import type { QuickOrderRow, VariantOption } from "@/types/line-item";
 
-// ─── Algolia ──────────────────────────────────────────────────────────────────
+// ─── Native search (mobile typeahead) ──────────────────────────────────────────
 
-const APP_ID = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID;
-const SEARCH_KEY = process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY;
-const INDEX = "catalyst B2B demo";
-const HAS_ALGOLIA = Boolean(APP_ID && SEARCH_KEY);
-
-// Lazy-load `algoliasearch/lite` so it stays out of the shared bundle (this
-// component is registered at the root layout). The ~50KB client only ships as
-// a separate async chunk the first time a buyer searches the mobile box, which
-// keeps it off the critical path on every page. Mirrors the dynamic-import
-// pattern in components/search/search-box.tsx.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let clientPromise: Promise<any> | null = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getSearchClient(): Promise<any> | null {
-  if (!HAS_ALGOLIA) return null;
-  if (!clientPromise) {
-    clientPromise = import("algoliasearch/lite").then(({ liteClient }) =>
-      liteClient(APP_ID!, SEARCH_KEY!),
-    );
-  }
-  return clientPromise;
-}
-
-interface AlgoliaHit {
-  objectID: string;
+// One result row from /api/shopify/search (Storefront predictiveSearch).
+interface SearchHit {
   sku: string;
   name: string;
   price?: number;
@@ -119,9 +95,9 @@ export function QuickOrderStrip(props: any) {
     || session?.permissions?.includes("company.orders.create") === true;
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  // ── Mobile / Algolia state ──
+  // ── Mobile / search state ──
   const [mobileQuery, setMobileQuery] = useState("");
-  const [mobileResults, setMobileResults] = useState<AlgoliaHit[]>([]);
+  const [mobileResults, setMobileResults] = useState<SearchHit[]>([]);
   const [showMobileDropdown, setShowMobileDropdown] = useState(false);
   const [clipboardSkus, setClipboardSkus] = useState<string[]>([]);
   const [pasteLoading, setPasteLoading] = useState(false);
@@ -239,7 +215,7 @@ export function QuickOrderStrip(props: any) {
     setCartError("");
   }
 
-  // ── Mobile: Algolia search ────────────────────────────────────────────────
+  // ── Mobile: native search typeahead ─────────────────────────────────────────────────
 
   const checkClipboard = useCallback(async () => {
     try {
@@ -255,22 +231,22 @@ export function QuickOrderStrip(props: any) {
 
   useEffect(() => {
     clearTimeout(mobileDebounceRef.current);
-    if (!mobileQuery.trim() || !HAS_ALGOLIA) {
+    if (!mobileQuery.trim()) {
       setMobileResults([]);
       setShowMobileDropdown(false);
       return;
     }
     mobileDebounceRef.current = setTimeout(async () => {
       try {
-        const client = await getSearchClient();
-        if (!client) return;
-        const response = await client.search({
-          requests: [{ indexName: INDEX, query: mobileQuery.trim(), hitsPerPage: 6 }],
-        });
-        const raw: RawConnectorHit[] = response.results?.[0]?.hits ?? [];
-        // Normalize connector fields (brand_name/calculated_prices/inventory)
-        // into the price/stockQty/brand the row reads.
-        const hits: AlgoliaHit[] = raw.map((h) => normalizeHit(h) as unknown as AlgoliaHit);
+        const res = await fetch(`/api/shopify/search?q=${encodeURIComponent(mobileQuery.trim())}&limit=6`);
+        const data: { products?: Array<{ sku: string; title: string; price: number; stockQty: number; vendor: string }> } = await res.json();
+        const hits: SearchHit[] = (data.products ?? []).map((p) => ({
+          sku: p.sku,
+          name: p.title,
+          price: p.price,
+          stockQty: p.stockQty,
+          brand: p.vendor,
+        }));
         setMobileResults(hits);
         setShowMobileDropdown(hits.length > 0);
       } catch {
@@ -293,7 +269,7 @@ export function QuickOrderStrip(props: any) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  function addFromAlgolia(hit: AlgoliaHit) {
+  function addFromSearch(hit: SearchHit) {
     setRows((prev) => {
       const exists = prev.find((r) => r.sku === hit.sku && r.status === "found");
       if (exists) {
@@ -754,7 +730,7 @@ export function QuickOrderStrip(props: any) {
           <div className="qow-shell">
             {/* White action card */}
             <div className="qow-inner">
-                {/* Algolia search */}
+                {/* Native search */}
                 <div className="qow-search-wrap">
                   <div className="qow-search-box">
                     <Icon name="search" size={15} style={{ color: "var(--muted-2)", flexShrink: 0 }} />
@@ -767,7 +743,7 @@ export function QuickOrderStrip(props: any) {
                       onFocus={() => { checkClipboard(); if (mobileResults.length) setShowMobileDropdown(true); }}
                       onKeyDown={(e) => {
                         if (e.key === "Escape") { setShowMobileDropdown(false); setMobileQuery(""); }
-                        if (e.key === "Enter" && mobileResults.length > 0) addFromAlgolia(mobileResults[0]);
+                        if (e.key === "Enter" && mobileResults.length > 0) addFromSearch(mobileResults[0]);
                       }}
                       placeholder="Type or paste SKU…"
                       autoComplete="off"
@@ -777,10 +753,10 @@ export function QuickOrderStrip(props: any) {
                     <div ref={mobileDropdownRef} className="qow-dropdown">
                       {mobileResults.map((hit) => (
                         <button
-                          key={hit.objectID}
+                          key={hit.sku}
                           type="button"
                           className="qow-result-row"
-                          onMouseDown={(e) => { e.preventDefault(); addFromAlgolia(hit); }}
+                          onMouseDown={(e) => { e.preventDefault(); addFromSearch(hit); }}
                         >
                           <span className="qow-result-info">
                             <span className="qow-result-name">{hit.name}</span>

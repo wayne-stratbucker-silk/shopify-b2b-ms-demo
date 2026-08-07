@@ -6,9 +6,9 @@ import { useState, useEffect, useRef } from "react";
 import { Icon } from "./ui/icons";
 import { useLocation } from "./location-provider";
 
-// Lazy-load the search box (Algolia autocomplete + its theme CSS) so its
-// bundle doesn't sit on the critical path of every page. The placeholder
-// reserves the 36px-tall search bar's footprint to avoid layout shift.
+// Lazy-load the search box (client-only typeahead over the native Shopify
+// search endpoint) so it stays off the critical path. The placeholder reserves
+// the 36px-tall search bar's footprint to avoid layout shift.
 const SearchBox = dynamic(
   () => import("./search/search-box").then((m) => m.SearchBox),
   {

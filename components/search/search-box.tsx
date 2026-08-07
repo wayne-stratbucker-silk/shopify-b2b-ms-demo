@@ -1,12 +1,19 @@
 "use client";
 
-import { createElement, Fragment, useEffect, useRef } from "react";
-import type { Root } from "react-dom/client";
+// Header search autocomplete — native Shopify.
+//
+// A self-contained typeahead over /api/shopify/search (Storefront
+// predictiveSearch). Replaces the former @algolia/autocomplete-js build. Reuses
+// the existing `.aa-*` styles in globals.css so the look is unchanged: 36px
+// bordered form + "Search" button, dropdown panel with product rows, a
+// "Need help?" empty state, a "see all results" footer, and a no-results note.
+
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icons";
 import { useLocation } from "@/components/location-provider";
 import { getSearchPhrases } from "@/lib/search-phrases";
-import { normalizeHit, type RawConnectorHit } from "@/lib/algolia/connector-hit";
+import type { SearchProduct } from "@/lib/shopify/queries/search";
 
 const TYPED_KEY = "acme_search_typed";
 
@@ -16,7 +23,7 @@ async function runTypewriter(inputEl: HTMLInputElement, phrases: string[]) {
   sessionStorage.setItem(TYPED_KEY, "1");
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-  const alive = () => document.contains(inputEl);
+  const alive = () => document.contains(inputEl) && !inputEl.value;
 
   inputEl.placeholder = "";
   await sleep(700);
@@ -39,30 +46,25 @@ async function runTypewriter(inputEl: HTMLInputElement, phrases: string[]) {
   }
 }
 
-const APP_ID = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID;
-const SEARCH_KEY = process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY;
-const INDEX = "catalyst B2B demo";
-
-interface ProductHit {
-  objectID: string;
-  sku: string;
-  parentSku?: string;
-  name: string;
-  price?: number;
-  stockQty?: number;
-  brand?: string;
-  path?: string;
-  image?: string | null;
-  // Required by @algolia/autocomplete-js BaseItem constraint
-  [key: string]: unknown;
+// Bold the matched query substring in a product title.
+function highlight(text: string, q: string) {
+  const query = q.trim();
+  if (!query) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <Fragment>
+      {text.slice(0, idx)}
+      <mark>{text.slice(idx, idx + query.length)}</mark>
+      {text.slice(idx + query.length)}
+    </Fragment>
+  );
 }
 
-// Resolve a search hit to its product URL. Uses the indexed path; if missing,
-// falls back to a SKU search so the click never dead-ends on bare /search.
-function itemUrl(item: ProductHit): string {
-  const path = (item.path ?? "").trim();
+function productUrl(p: SearchProduct): string {
+  const path = (p.path ?? "").trim();
   if (path && path !== "#" && path !== "/") return path;
-  const sku = (item.sku ?? "").trim();
+  const sku = (p.sku ?? "").trim();
   return sku ? `/search?q=${encodeURIComponent(sku)}` : "/search";
 }
 
@@ -71,249 +73,222 @@ export function SearchBox({
 }: {
   placeholder?: string;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const panelRootRef = useRef<Root | null>(null);
-  const rootRef = useRef<Element | null>(null);
   const router = useRouter();
   const { activeContact } = useLocation();
-  const activeContactRef = useRef(activeContact);
-  useEffect(() => { activeContactRef.current = activeContact; }, [activeContact]);
 
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const reqRef = useRef(0);
+
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchProduct[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  const trimmed = query.trim();
+
+  // Debounced native predictive search.
   useEffect(() => {
-    if (!containerRef.current || !APP_ID || !SEARCH_KEY) return;
+    setActiveIndex(-1);
+    if (!trimmed) { setResults([]); setLoading(false); return; }
+    setLoading(true);
+    const t = setTimeout(async () => {
+      const reqId = ++reqRef.current;
+      try {
+        const res = await fetch(`/api/shopify/search?q=${encodeURIComponent(trimmed)}&limit=8`);
+        const data: { products?: SearchProduct[] } = await res.json();
+        if (reqRef.current === reqId) { setResults(data.products ?? []); setLoading(false); }
+      } catch {
+        if (reqRef.current === reqId) { setResults([]); setLoading(false); }
+      }
+    }, 200);
+    return () => clearTimeout(t);
+  }, [trimmed]);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let instance: any = null;
-    let cancelled = false;
+  // Close on outside click.
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
 
-    // Lazily load the heavy Algolia autocomplete bundle (and its theme) only
-    // after mount, so it stays out of the shared client bundle and off the
-    // initial main-thread / TTI critical path on every page.
-    Promise.all([
-      import("@algolia/autocomplete-js"),
-      import("algoliasearch/lite"),
-      import("react-dom/client"),
-      // @ts-expect-error — CSS side-effect import has no type
-      import("@algolia/autocomplete-theme-classic"),
-    ]).then(([aa, algolia, rdc]) => {
-      if (cancelled || !containerRef.current) return;
-      const { autocomplete, getAlgoliaResults } = aa;
-      const { createRoot } = rdc;
-      const searchClient = algolia.liteClient(APP_ID, SEARCH_KEY);
+  // Typewriter placeholder — once per session.
+  useEffect(() => {
+    if (inputRef.current) {
+      const phrases = [placeholder, ...getSearchPhrases()].filter(Boolean);
+      runTypewriter(inputRef.current, phrases);
+    }
+  }, [placeholder]);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      instance = (autocomplete as any)({
-        container: containerRef.current,
-        panelContainer: document.body,
-        placeholder,
-        openOnFocus: true,
-        insights: false,
-        renderer: { createElement, Fragment, render: () => {} },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        render({ children }: any, root: any) {
-          if (!panelRootRef.current || rootRef.current !== root) {
-            rootRef.current = root;
-            panelRootRef.current?.unmount();
-            panelRootRef.current = createRoot(root);
-          }
-          panelRootRef.current.render(children);
-        },
-        // Submit → navigate to SERP
-        onSubmit({ state }: { state: { query: string } }) {
-          const q = state.query.trim();
-          if (q) router.push(`/search?q=${encodeURIComponent(q)}`);
-        },
-        // Custom submit button: render "Search" label + icon
-        submitButtonIconComponent: (() => (
+  const submit = useCallback((q: string) => {
+    const v = q.trim();
+    if (!v) return;
+    setOpen(false);
+    router.push(`/search?q=${encodeURIComponent(v)}`);
+  }, [router]);
+
+  const go = useCallback((p: SearchProduct) => {
+    setOpen(false);
+    router.push(productUrl(p));
+  }, [router]);
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true);
+      setActiveIndex((i) => Math.min(i + 1, results.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, -1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeIndex >= 0 && results[activeIndex]) go(results[activeIndex]);
+      else submit(query);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      inputRef.current?.blur();
+    }
+  }
+
+  const showPanel = open;
+  const showHelp = showPanel && !trimmed;
+  const showResults = showPanel && !!trimmed;
+
+  return (
+    <div ref={wrapperRef} className="aa-wrapper">
+      <form
+        className="aa-Form"
+        role="search"
+        onSubmit={(e) => { e.preventDefault(); submit(query); }}
+      >
+        <input
+          ref={inputRef}
+          className="aa-Input"
+          type="search"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder={placeholder}
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={onKeyDown}
+          aria-label="Search products"
+        />
+        <button type="submit" className="aa-SubmitButton" aria-label="Search">
           <span className="aa-search-label">
             <Icon name="search" size={14} />
             <span className="aa-search-text">Search</span>
           </span>
-        )) as unknown as undefined,
-        getSources({ query }: { query: string }) {
-          if (!query.trim() || !searchClient) {
-            const contact = activeContactRef.current;
-            return [{
-              sourceId: "help",
-              getItems: () => [],
-              templates: {
-                header() {
-                  // Mirror the PDP "Need help?" contact card (components/pdp-contact-card.tsx).
-                  // Same data source: useLocation().activeContact. Render only the
-                  // values that are actually present — never fabricate contact info.
-                  const hasContact = Boolean(contact.phone || contact.email);
-                  return (
-                    <div className="aa-help-card">
-                      <p className="aa-help-title">Need help?</p>
-                      <p className="aa-help-sub">
-                        Questions about specs, availability, or pricing?
-                      </p>
-                      {hasContact && (
-                        <div className="aa-help-actions">
-                          {contact.phone && (
-                            <a
-                              href={`tel:${contact.phone.replace(/\s/g, "")}`}
-                              className="btn btn-ghost btn-sm btn-block"
-                              style={{ textDecoration: "none" }}
-                            >
-                              <Icon name="headset" size={13} />
-                              Chat with our team
-                            </a>
-                          )}
-                          {contact.email && (
-                            <a
-                              href={`mailto:${contact.email}`}
-                              className="btn btn-ghost btn-sm btn-block"
-                              style={{ textDecoration: "none" }}
-                            >
-                              <Icon name="quote" size={13} />
-                              Email our team
-                            </a>
+        </button>
+      </form>
+
+      {showPanel && (
+        <div className="aa-Panel">
+          <div className="aa-PanelLayout">
+            {showHelp && <HelpCard contact={activeContact} />}
+
+            {showResults && results.length > 0 && (
+              <>
+                <ul className="aa-List" role="listbox" aria-label="Search results">
+                  {results.map((p, i) => (
+                    <li
+                      key={p.handle + i}
+                      className="aa-Item"
+                      role="option"
+                      aria-selected={i === activeIndex}
+                      onMouseEnter={() => setActiveIndex(i)}
+                      onMouseDown={(e) => { e.preventDefault(); go(p); }}
+                    >
+                      <div className="aa-product-item">
+                        <div className="aa-product-thumb">
+                          {p.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={p.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          ) : (
+                            <Icon name="pkg" size={14} />
                           )}
                         </div>
-                      )}
-                      {(contact.locationName || contact.hours) && (
-                        <p className="aa-help-meta">
-                          {contact.locationName && (
-                            <span className="aa-help-meta-row">
-                              <Icon name="pin" size={12} />
-                              {contact.locationName}
-                            </span>
-                          )}
-                          {contact.hours && (
-                            <span className="aa-help-meta-row">
-                              <Icon name="info" size={12} />
-                              {contact.hours}
-                            </span>
-                          )}
-                        </p>
-                      )}
-                    </div>
-                  );
-                },
-              },
-            }];
-          }
-          return [
-            {
-              sourceId: "products",
-              getItems() {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                return (getAlgoliaResults as any)({
-                  searchClient,
-                  queries: [
-                    {
-                      indexName: INDEX,
-                      params: { query, hitsPerPage: 12 },
-                    },
-                  ],
-                });
-              },
-              transformItems(items: RawConnectorHit[]) {
-                // Normalize connector records (brand_name/image_url/…) into the
-                // canonical fields ProductItem reads, preserving _highlightResult
-                // for <Highlight>. Show all matches (cards fall back to a
-                // placeholder thumb); don't drop image-less products.
-                return items.slice(0, 6).map((h) => normalizeHit(h) as unknown as ProductHit);
-              },
-              getItemUrl({ item }: { item: ProductHit }) {
-                return itemUrl(item);
-              },
-              onSelect({ item }: { item: ProductHit }) {
-                router.push(itemUrl(item));
-              },
-              templates: {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                item({ item, components }: any) {
-                  return <ProductItem hit={item} components={components} />;
-                },
-                footer({ state }: { state: { query: string } }) {
-                  return (
-                    <a
-                      href={`/search?q=${encodeURIComponent(state.query)}`}
-                      className="aa-footer-link"
-                    >
-                      <Icon name="search" size={13} />
-                      See all results for &ldquo;{state.query}&rdquo;
-                      <Icon name="arrow" size={13} />
-                    </a>
-                  );
-                },
-                noResults() {
-                  return (
-                    <div className="aa-no-results">
-                      No products found — try a different keyword or SKU.
-                    </div>
-                  );
-                },
-              },
-            },
-          ];
-        },
-      });
+                        <div className="aa-product-info">
+                          <div className="aa-product-meta">
+                            {p.sku}{p.vendor ? ` · ${p.vendor}` : ""}
+                          </div>
+                          <div className="aa-product-name">{highlight(p.title, trimmed)}</div>
+                        </div>
+                        <div className="aa-product-price">
+                          {p.price > 0 && <div className="aa-price-value">${p.price.toFixed(2)}</div>}
+                          <div className={`aa-stock-badge ${p.inStock ? "in-stock" : "backorder"}`}>
+                            {p.inStock ? `${p.stockQty.toLocaleString()} in stock` : "Backorder"}
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href={`/search?q=${encodeURIComponent(trimmed)}`}
+                  className="aa-footer-link"
+                  onMouseDown={(e) => { e.preventDefault(); submit(query); }}
+                >
+                  <Icon name="search" size={13} />
+                  See all results for &ldquo;{trimmed}&rdquo;
+                  <Icon name="arrow" size={13} />
+                </a>
+              </>
+            )}
 
-      // Typewriter: run once per session on the real input (skipped in detached/mobile mode)
-      const inputEl = containerRef.current?.querySelector<HTMLInputElement>("input.aa-Input");
-      if (inputEl) {
-        const allPhrases = [placeholder, ...getSearchPhrases()].filter(Boolean);
-        runTypewriter(inputEl, allPhrases);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      instance?.destroy();
-      panelRootRef.current?.unmount();
-      panelRootRef.current = null;
-    };
-  // router is stable in Next.js App Router; placeholder rarely changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return <div ref={containerRef} className="aa-wrapper" />;
+            {showResults && results.length === 0 && !loading && (
+              <div className="aa-no-results">
+                No products found — try a different keyword or SKU.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
-function ProductItem({
-  hit,
-  components,
-}: {
-  hit: ProductHit;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  components: any;
-}) {
+function HelpCard({ contact }: { contact: ReturnType<typeof useLocation>["activeContact"] }) {
+  const hasContact = Boolean(contact.phone || contact.email);
   return (
-    <div className="aa-product-item">
-      <div className="aa-product-thumb">
-        {hit.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={hit.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        ) : (
-          <Icon name="pkg" size={14} />
-        )}
-      </div>
-      <div className="aa-product-info">
-        <div className="aa-product-meta">
-          {hit.sku}
-          {hit.brand ? ` · ${hit.brand}` : ""}
+    <div className="aa-help-card">
+      <p className="aa-help-title">Need help?</p>
+      <p className="aa-help-sub">Questions about specs, availability, or pricing?</p>
+      {hasContact && (
+        <div className="aa-help-actions">
+          {contact.phone && (
+            <a href={`tel:${contact.phone.replace(/\s/g, "")}`} className="btn btn-ghost btn-sm btn-block" style={{ textDecoration: "none" }}>
+              <Icon name="headset" size={13} />
+              Chat with our team
+            </a>
+          )}
+          {contact.email && (
+            <a href={`mailto:${contact.email}`} className="btn btn-ghost btn-sm btn-block" style={{ textDecoration: "none" }}>
+              <Icon name="quote" size={13} />
+              Email our team
+            </a>
+          )}
         </div>
-        <div className="aa-product-name">
-          <components.Highlight hit={hit} attribute="name" />
-        </div>
-      </div>
-      <div className="aa-product-price">
-        {hit.price != null && (
-          <div className="aa-price-value">${hit.price.toFixed(2)}</div>
-        )}
-        <div
-          className={`aa-stock-badge ${
-            (hit.stockQty ?? 0) > 0 ? "in-stock" : "backorder"
-          }`}
-        >
-          {(hit.stockQty ?? 0) > 0
-            ? `${(hit.stockQty ?? 0).toLocaleString()} in stock`
-            : "Backorder"}
-        </div>
-      </div>
+      )}
+      {(contact.locationName || contact.hours) && (
+        <p className="aa-help-meta">
+          {contact.locationName && (
+            <span className="aa-help-meta-row">
+              <Icon name="pin" size={12} />
+              {contact.locationName}
+            </span>
+          )}
+          {contact.hours && (
+            <span className="aa-help-meta-row">
+              <Icon name="info" size={12} />
+              {contact.hours}
+            </span>
+          )}
+        </p>
+      )}
     </div>
   );
 }
