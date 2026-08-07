@@ -2941,8 +2941,14 @@ input::placeholder, textarea::placeholder {
 .nv-items {
   display: flex; align-items: stretch; gap: 0;
   flex: 1; min-width: 0;
+  /* Clips items that don't fit before the overflow measurement runs. But a flat
+     category opens a compact .nv-content-dropdown INSIDE its .nv-item button —
+     which hangs below the bar and would be clipped here, hiding it behind page
+     content. Only clip while closed; when a panel is open let it escape. Folded
+     items stay hidden via `display:none`, so this never re-reveals them. */
   overflow: hidden;
 }
+.nv-bar.open .nv-items { overflow: visible; }
 .nv-item {
   position: relative;
   display: inline-flex; align-items: center; gap: 6px;
