@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.googletagmanager.com https://*.google-analytics.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://cdn.shopify.com https://*.myshopify.com https://s.mkswft.com https://*.makeswift.com https://*.makeswift-files.com https://*.google-analytics.com",
-      "connect-src 'self' https://*.algolia.net https://*.algolianet.com https://*.google-analytics.com https://*.googletagmanager.com https://*.myshopify.com",
+      "connect-src 'self' https://*.google-analytics.com https://*.googletagmanager.com https://*.myshopify.com",
       "font-src 'self' data:",
       "frame-src 'self' https://app.makeswift.com https://*.makeswift.com",
       "frame-ancestors 'self' https://app.makeswift.com https://*.makeswift.com",

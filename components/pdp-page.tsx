@@ -12,17 +12,21 @@ import { PdpContactCard } from "@/components/pdp-contact-card";
 // BC types stubbed out for Shopify compatibility
 type BCMgmtVariant = { id: number; sku: string; price?: number; inventory_level?: number; upc?: string; mpn?: string; option_values: Array<{ option_id: number; id: number; option_display_name: string; label: string }> };
 type ProductOptionConfig = { displayName: string; optionId: number; displayStyle?: string; values: Array<{ label: string; isDefault: boolean; id: number }> };
-// Related products via Algolia — products in the same category, excluding the
-// one being viewed. Replaces the BigCommerce related-products path.
-async function fetchRelatedProducts(currentHandle: string, catSlug: string): Promise<Product[]> {
-  if (!catSlug) return [];
-  const seed = await fetchCollectionPLP(catSlug).catch(() => null);
-  if (!seed) return [];
-  return seed.products.filter((p) => p.handle && p.handle !== currentHandle).slice(0, 4);
+// Related products via native Shopify. Prefer Shopify's own related-product
+// recommendations; fall back to the category collection when none are returned.
+async function fetchRelatedProducts(productId: string, currentHandle: string, catSlug: string): Promise<Product[]> {
+  const recs = await getProductRecommendations(productId).catch(() => []);
+  let pool: Product[] = recs.map((n) => mapProduct(n));
+  if (pool.length === 0 && catSlug) {
+    const collection = await getCollectionProducts(catSlug, 8).catch(() => null);
+    pool = collection ? collection.products.edges.map((e) => mapProduct(e.node)) : [];
+  }
+  return pool.filter((p) => p.handle && p.handle !== currentHandle).slice(0, 4);
 }
 import { getSession } from "@/lib/auth/session";
 import { getSalesRep } from "@/lib/b2b/sales-rep";
-import { fetchCollectionPLP } from "@/lib/algolia/collection-products";
+import { getCollectionProducts, getProductRecommendations } from "@/lib/shopify/queries/products";
+import { mapProduct } from "@/lib/shopify/product-fetcher";
 import { getProductReviews } from "@/lib/reviews";
 import { client } from "@/lib/makeswift/client";
 import type { Product } from "@/types";
@@ -138,7 +142,7 @@ export async function PDPPage({ result }: { result: PDPResult }) {
     .replace(/\s+/g, "-");
 
   const [related, reviews] = await Promise.all([
-    fetchRelatedProducts(product.handle, catSlug),
+    fetchRelatedProducts(product.id, product.handle, catSlug),
     getProductReviews(String(rawId)),
   ]);
   const reviewCount = reviews.count;

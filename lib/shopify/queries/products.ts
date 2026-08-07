@@ -119,6 +119,20 @@ export async function getFeaturedProducts(first = 12, buyer?: BuyerContext): Pro
   return data.products.edges.map((e) => e.node);
 }
 
+// Shopify's own related-product recommendations for a PDP. Purpose-built and
+// independent of collection/category handles.
+export async function getProductRecommendations(productId: string, buyer?: BuyerContext): Promise<ShopifyProduct[]> {
+  const data = await storefrontQuery<{ productRecommendations: ShopifyProduct[] | null }>(
+    `query ProductRecommendations($productId: ID!) {
+      productRecommendations(productId: $productId, intent: RELATED) { ${PRODUCT_FIELDS} }
+    }`,
+    { productId },
+    buyer,
+    [`recommendations:${productId}`],
+  );
+  return data.productRecommendations ?? [];
+}
+
 export async function getProductsByVendor(vendor: string, first = 24, buyer?: BuyerContext): Promise<ShopifyProduct[]> {
   const data = await storefrontQuery<{
     products: { edges: Array<{ node: ShopifyProduct }> };
