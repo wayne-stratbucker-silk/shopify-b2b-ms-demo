@@ -262,7 +262,7 @@ export default function MegaNav({
   const openIsFlat = isFlat(openItem);
 
   return (
-    <div className={`nv-bar ${compact ? "compact" : ""}${className ? ` ${className}` : ""}`} ref={barRef}>
+    <div className={`nv-bar ${openId ? "open" : ""} ${compact ? "compact" : ""}${className ? ` ${className}` : ""}`} ref={barRef}>
       <div className="nv-bar-inner">
         {showAnchor && (
           <button
