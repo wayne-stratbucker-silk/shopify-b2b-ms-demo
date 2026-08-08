@@ -22,15 +22,18 @@ function statusCls(s: string): string {
   return "info";
 }
 
-const ORDER_COLUMNS: SortColumn[] = [
-  { header: "Order", sortable: true },
-  { header: "Date", sortable: true },
-  { header: "Buyer", sortable: true },
-  { header: "PO #", thClassName: "col-hide" },
-  { header: "Status", sortable: true },
-  { header: "Total", align: "num", sortable: true },
-  { header: "" },
-];
+// Buyer column only appears on the Company-orders view (matches the accelerator).
+function orderColumns(showAll: boolean): SortColumn[] {
+  return [
+    { header: "Order", sortable: true },
+    { header: "Date", sortable: true },
+    ...(showAll ? [{ header: "Buyer", sortable: true } as SortColumn] : []),
+    { header: "PO #", thClassName: "col-hide" },
+    { header: "Status", sortable: true },
+    { header: "Total", align: "num", sortable: true },
+    { header: "" },
+  ];
+}
 
 interface ShopifyOrder {
   id: string;
@@ -122,15 +125,15 @@ export default async function OrdersPage({ searchParams }: Props) {
       {/* KPI tiles */}
       {totalOrders > 0 && (
         <div className="g4" style={{ marginBottom: 24 }}>
-          {[
+          {([
             { label: "Total orders", value: String(totalOrders) },
             { label: "MTD value", value: fmt(mtdValue, currency) },
             { label: "YTD value", value: fmt(ytdValue, currency) },
-            { label: "Fulfilled", value: String(fulfilledCount) },
-          ].map(({ label, value }) => (
+            { label: "Fulfilled", value: String(fulfilledCount), color: fulfilledCount > 0 ? "var(--success)" : undefined },
+          ] as Array<{ label: string; value: string; color?: string }>).map(({ label, value, color }) => (
             <div key={label} className="kpi">
               <div className="lbl">{label}</div>
-              <div className="val">{value}</div>
+              <div className="val" style={color ? { color } : undefined}>{value}</div>
             </div>
           ))}
         </div>
@@ -144,7 +147,7 @@ export default async function OrdersPage({ searchParams }: Props) {
         <SortableTable
           tableClassName="tbl tbl-mobile-cards"
           initialSort={{ index: 1, dir: "desc" }}
-          columns={ORDER_COLUMNS}
+          columns={orderColumns(showAll)}
           rows={orders.map((order): SortRow => {
             const amt = parseFloat(order.totalPriceSet.shopMoney.amount);
             const buyer = order.customer ? `${order.customer.firstName ?? ""} ${order.customer.lastName ?? ""}`.trim() : "";
@@ -154,7 +157,7 @@ export default async function OrdersPage({ searchParams }: Props) {
               cells: [
                 { className: "col-primary", sortValue: order.name, content: <Link href={href} className="tbl row-link">{order.name}</Link> },
                 { className: "col-meta muted", sortValue: new Date(order.createdAt).getTime(), content: fmtDate(order.createdAt) },
-                { className: "col-meta", sortValue: buyer.toLowerCase(), content: buyer || "—" },
+                ...(showAll ? [{ className: "col-meta", sortValue: buyer.toLowerCase(), content: buyer || "—" }] : []),
                 { className: "col-hide mono", sortValue: order.poNumber ?? "", content: <span style={{ fontSize: 12 }}>{order.poNumber || "—"}</span> },
                 { className: "col-status", sortValue: order.displayFinancialStatus, content: <span className={`status status-${statusCls(order.displayFinancialStatus)}`}>{order.displayFinancialStatus}</span> },
                 { className: "col-value num", sortValue: amt, content: fmt(amt, order.totalPriceSet.shopMoney.currencyCode) },
