@@ -1,3 +1,5 @@
+import { MakeswiftComponent } from "@makeswift/runtime/next";
+import { getSiteVersion } from "@makeswift/runtime/next/server";
 import { getSession } from "@/lib/auth/session";
 import { adminQuery } from "@/lib/shopify/admin-client";
 import { getCreditLine } from "@/lib/b2b/credit";
@@ -6,9 +8,39 @@ import { getQuotesForCustomer } from "@/lib/quotes/client";
 import { getLists } from "@/lib/lists/client";
 import { CreditLineCard } from "@/components/account/credit-line-card";
 import { OpenQuotesCard, SavedListsCard } from "@/components/account/dashboard-regions";
+import { client } from "@/lib/makeswift/client";
 import Link from "next/link";
+// Register the region host + every account card so builder-dropped components
+// resolve when this dashboard renders (the account layout only registers the
+// header/footer nav).
+import "@/components/makeswift/register";
 
 export const dynamic = "force-dynamic";
+
+// Fixed snapshot ids for the three editable dashboard regions — one per
+// position, authored independently in the Makeswift builder.
+const DASH_REGIONS = {
+  top: { id: "acme-account-dash-top", label: "Account Dashboard — Top Region" },
+  middle: { id: "acme-account-dash-middle", label: "Account Dashboard — Middle Region" },
+  bottom: { id: "acme-account-dash-bottom", label: "Account Dashboard — Bottom Region" },
+} as const;
+
+// Editable Makeswift region on the account dashboard (mirrors HeaderNavSlot in
+// app/(storefront)/layout.tsx). The region host renders no DOM of its own, so
+// dropped components own their spacing; an unauthored/empty region collapses to
+// nothing on the live site while staying droppable inside the Makeswift builder.
+async function AccountDashboardRegion({ position }: { position: keyof typeof DASH_REGIONS }) {
+  const { id, label } = DASH_REGIONS[position];
+  const snapshot = await client
+    .getComponentSnapshot(id, { siteVersion: getSiteVersion() })
+    .catch(() => null);
+  if (!snapshot) return null;
+  return (
+    <div style={position === "top" ? { marginBottom: 24 } : { marginTop: 24 }}>
+      <MakeswiftComponent snapshot={snapshot} label={label} type="acme/account-dashboard-region" />
+    </div>
+  );
+}
 
 async function getRecentOrders(companyId: string | undefined, customerId: string) {
   let query: string;
@@ -83,6 +115,9 @@ export default async function AccountDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Editable Makeswift region — top (below greeting) */}
+        <AccountDashboardRegion position="top" />
 
         {/* Credit line summary */}
         {credit && (
@@ -178,11 +213,17 @@ export default async function AccountDashboard() {
           </div>
         </div>
 
+        {/* Editable Makeswift region — middle (below the orders/rep row) */}
+        <AccountDashboardRegion position="middle" />
+
         {/* Row: Open quotes + Saved lists */}
         <div className="g2" style={{ marginBottom: 24 }}>
           <OpenQuotesCard quotes={activeQuotes} />
           <SavedListsCard lists={lists} />
         </div>
+
+        {/* Editable Makeswift region — bottom (below all cards) */}
+        <AccountDashboardRegion position="bottom" />
       </div>
     </div>
   );

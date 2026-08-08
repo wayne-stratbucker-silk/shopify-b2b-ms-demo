@@ -72,5 +72,5 @@ export default async function UsersPage() {
     };
   });
 
-  return <UsersClient members={members} />;
+  return <UsersClient members={members} currentEmail={session.email} />;
 }
