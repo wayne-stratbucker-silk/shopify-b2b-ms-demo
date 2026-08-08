@@ -34,3 +34,7 @@ import "@/components/makeswift/not-found-page";
 import "@/components/makeswift/seo-page-auditor";
 import "@/components/makeswift/role-scope";
 import "@/components/makeswift/page-content-region";
+import "@/components/makeswift/account-dashboard-region";
+import "@/components/makeswift/account-quick-links";
+import "@/components/makeswift/account-company-info";
+import "@/components/makeswift/account-reorder";

@@ -2,12 +2,15 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
-import { getQuotesForCompany, getQuotesForCustomer } from "@/lib/quotes/client";
+import { getQuote, getQuotesForCompany, getQuotesForCustomer } from "@/lib/quotes/client";
 import { getQuoteCartDraftOrderId } from "@/lib/quotes/quote-cart";
 import { Icon } from "@/components/ui/icons";
-import { UrgencyPill } from "@/components/account/urgency-pill";
-import type { Quote, QuoteStatus } from "@/types";
+import { QuotesTable } from "./quotes-client";
+import type { Quote } from "@/types";
 
+export const dynamic = "force-dynamic";
+
+const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 function isExpiringSoon(dateStr: string, withinDays = 7): boolean {
   try {
@@ -16,34 +19,15 @@ function isExpiringSoon(dateStr: string, withinDays = 7): boolean {
   } catch { return false; }
 }
 
-export const dynamic = "force-dynamic";
-
-const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
-
-function fmtDate(s: string) {
-  try { return new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); }
-  catch { return "—"; }
-}
-
-const STATUS_LABELS: Record<QuoteStatus, string> = {
-  draft: "Draft",
-  new: "Awaiting Review",
-  in_process: "Quote Ready",
-  updated_by_buyer: "Updated",
-  ordered: "Ordered",
-  expired: "Expired",
-  archived: "Archived",
-};
-
-const STATUS_CLS: Record<QuoteStatus, string> = {
-  draft: "muted",
-  new: "info",
-  in_process: "ok",
-  updated_by_buyer: "warn",
-  ordered: "muted",
-  expired: "err",
-  archived: "muted",
-};
+const TAB_LINK = (active: boolean): React.CSSProperties => ({
+  padding: "8px 16px",
+  fontSize: 13,
+  fontWeight: active ? 600 : 400,
+  color: active ? "var(--primary)" : "var(--muted)",
+  borderBottom: active ? "2px solid var(--primary)" : "2px solid transparent",
+  textDecoration: "none",
+  marginBottom: -1,
+});
 
 type Props = { searchParams: Promise<{ view?: string }> };
 
@@ -58,24 +42,43 @@ export default async function QuotesPage({ searchParams }: Props) {
 
   const { view } = await searchParams;
   const canViewAll = hasPermission(session.permissions, "company.quotes.view_all");
-  const showAll = view === "all" && canViewAll;
+  // Default to the user's own quotes ("My quotes" is the first/default tab); the
+  // company-wide view is opt-in via ?view=company and gated on view_all.
+  const currentView: "company" | "my" =
+    view === "company" && canViewAll ? "company" : "my";
 
-  const quotes: Quote[] = showAll && session.companyId
+  const quotes: Quote[] = currentView === "company" && session.companyId
     ? await getQuotesForCompany(session.companyId).catch(() => [])
     : await getQuotesForCustomer(session.customerId).catch(() => []);
 
-  const hasQuoteCart = !!(await getQuoteCartDraftOrderId().catch(() => null));
+  // Active quote-cart (cookie-backed draft order) → surface a tab to jump into
+  // it, with an item-count badge. Only one cheap Admin call, and only when a
+  // cart exists.
+  const cartDraftId = await getQuoteCartDraftOrderId().catch(() => null);
+  let quoteCartCount = 0;
+  if (cartDraftId) {
+    const cart = await getQuote(cartDraftId).catch(() => null);
+    quoteCartCount = cart?.quoteItems?.reduce((s, i) => s + (i.qty ?? 1), 0) ?? 0;
+  }
 
-  const pendingCount = quotes.filter((q) => q.status === "new" || q.status === "updated_by_buyer").length;
-
+  // Expiring-soon alert (Quote Ready quotes lapsing within 7 days).
   const soonExpiring = quotes.filter(
     (q) => q.expires && q.status === "in_process" && isExpiringSoon(q.expires),
   );
 
-  // KPI summary (mirrors the invoices page tiles).
-  const activeQuotes = quotes.filter((q) => !["ordered", "expired", "archived"].includes(q.status));
-  const openValue = activeQuotes.reduce((s, q) => s + (q.total > 0 ? q.total : 0), 0);
-  const readyCount = quotes.filter((q) => q.status === "in_process").length;
+  // ── KPIs (mirror the invoices page tiles) ──────────────────────────────────
+  const now = new Date();
+  const activeStatuses = (q: Quote) => !["ordered", "expired", "archived"].includes(q.status);
+  const totalCount = quotes.length;
+  // MTD/YTD quote value by created date.
+  const mtdValue = quotes
+    .filter((q) => { const d = new Date(q.date); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); })
+    .reduce((s, q) => s + (q.total > 0 ? q.total : 0), 0);
+  const ytdValue = quotes
+    .filter((q) => new Date(q.date).getFullYear() === now.getFullYear())
+    .reduce((s, q) => s + (q.total > 0 ? q.total : 0), 0);
+  const orderedQuotes = quotes.filter((q) => q.status === "ordered").length;
+  const openValue = quotes.filter(activeStatuses).reduce((s, q) => s + (q.total > 0 ? q.total : 0), 0);
 
   return (
     <div>
@@ -90,114 +93,105 @@ export default async function QuotesPage({ searchParams }: Props) {
         </div>
       )}
 
+      {/* Page header */}
       <div className="page-h">
         <div>
-          <h1>Quotes</h1>
+          <h1>{currentView === "company" ? "Company quotes" : "My quotes"}</h1>
+          <p className="sub">{totalCount} {totalCount === 1 ? "quote" : "quotes"}</p>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          {hasQuoteCart && (
-            <Link href="/account/quotes/cart" className="btn btn-ghost btn-sm">
-              Quote cart
-            </Link>
-          )}
           <Link href="/account/quotes/new" className="btn btn-sm">
-            + New quote
+            <Icon name="plus" size={14} />
+            New quote
           </Link>
         </div>
       </div>
 
-      {canViewAll && (
-        <div className="row" style={{ gap: 0, marginBottom: 20, borderBottom: "1px solid var(--line)" }}>
-          <Link
-            href="/account/quotes"
-            style={{ padding: "10px 16px", borderBottom: `2px solid ${!showAll ? "var(--primary)" : "transparent"}`, color: !showAll ? "var(--primary)" : "var(--muted)", fontSize: 13, fontWeight: !showAll ? 500 : 400, textDecoration: "none" }}
-          >
-            My quotes
-          </Link>
-          <Link
-            href="/account/quotes?view=all"
-            style={{ padding: "10px 16px", borderBottom: `2px solid ${showAll ? "var(--primary)" : "transparent"}`, color: showAll ? "var(--primary)" : "var(--muted)", fontSize: 13, fontWeight: showAll ? 500 : 400, textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}
-          >
-            Company quotes
-            {!showAll && pendingCount > 0 && (
-              <span className="status status-warn" style={{ fontSize: 10, padding: "1px 6px" }}>{pendingCount} pending</span>
-            )}
-          </Link>
-        </div>
-      )}
-      {showAll && canViewAll && pendingCount > 0 && (
-        <div style={{ marginBottom: 12, fontSize: 13, color: "var(--muted)" }}>
-          <span className="status status-warn" style={{ marginRight: 8 }}>{pendingCount} pending</span>
-          {pendingCount === 1 ? "quote requires" : "quotes require"} review
+      {/* Tabs — My / Company (view_all only) + Quote cart link */}
+      {(canViewAll || quoteCartCount > 0) && (
+        <div className="row" style={{ gap: 0, marginBottom: 20, borderBottom: "1px solid var(--line)", alignItems: "center" }}>
+          {canViewAll && (
+            <>
+              <Link href="/account/quotes?view=my" style={TAB_LINK(currentView === "my")}>
+                My quotes
+              </Link>
+              <Link href="/account/quotes?view=company" style={TAB_LINK(currentView === "company")}>
+                Company quotes
+              </Link>
+            </>
+          )}
+          {quoteCartCount > 0 && (
+            <Link
+              href="/account/quotes/cart"
+              style={{
+                marginLeft: "auto",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 16px",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--primary)",
+                textDecoration: "none",
+                marginBottom: -1,
+              }}
+            >
+              Quote cart
+              <span
+                style={{
+                  background: "var(--primary)",
+                  color: "#fff",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "1px 7px",
+                  minWidth: 18,
+                  textAlign: "center",
+                }}
+              >
+                {quoteCartCount}
+              </span>
+            </Link>
+          )}
         </div>
       )}
 
-      {quotes.length > 0 && (
-        <div className="g3" style={{ marginBottom: 24 }}>
+      {/* KPI tiles */}
+      {totalCount > 0 && (
+        <div className="g4" style={{ marginBottom: 24 }}>
           <div className="kpi">
-            <div className="lbl">Open Quotes</div>
-            <div className="val">{activeQuotes.length}</div>
-            <div className="delta">{openValue > 0 ? `${fmt(openValue)} in play` : "—"}</div>
+            <span className="lbl">Total quotes</span>
+            <span className="val">{totalCount}</span>
+            <span className="delta">{openValue > 0 ? `${fmt(openValue)} in play` : "all time"}</span>
           </div>
           <div className="kpi">
-            <div className="lbl">Awaiting Review</div>
-            <div className="val" style={{ color: pendingCount > 0 ? "var(--warn, #d97706)" : "inherit" }}>{pendingCount}</div>
-            <div className="delta">{pendingCount > 0 ? "Pending sales review" : "All reviewed"}</div>
+            <span className="lbl">MTD quote value</span>
+            <span className="val">{fmt(mtdValue)}</span>
+            <span className="delta">this calendar month</span>
           </div>
           <div className="kpi">
-            <div className="lbl">Ready to Order</div>
-            <div className="val" style={{ color: readyCount > 0 ? "var(--success, #16a34a)" : "inherit" }}>{readyCount}</div>
-            <div className="delta">{soonExpiring.length > 0 ? `${soonExpiring.length} expiring soon` : "Priced & ready"}</div>
+            <span className="lbl">YTD quote value</span>
+            <span className="val">{fmt(ytdValue)}</span>
+            <span className="delta">this calendar year</span>
+          </div>
+          <div className="kpi">
+            <span className="lbl">Ordered quotes</span>
+            <span className="val" style={{ color: "var(--success, #16a34a)" }}>{orderedQuotes}</span>
+            <span className="delta">converted to orders</span>
           </div>
         </div>
       )}
 
-      {quotes.length === 0 ? (
+      {/* Quotes table (client-side sortable) */}
+      {totalCount === 0 ? (
         <div className="card" style={{ padding: "40px 16px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
           No quotes yet.{" "}
           <Link href="/account/quotes/new" style={{ color: "var(--primary)" }}>Request your first quote →</Link>
         </div>
       ) : (
-        <table className="tbl tbl-mobile-cards">
-          <thead>
-            <tr>
-              <th>Quote</th>
-              <th>Date</th>
-              <th className="col-hide">Title</th>
-              <th>Status</th>
-              <th className="num">Total</th>
-              <th className="col-meta">Expires</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {quotes.map(q => (
-              <tr key={q.id}>
-                <td className="col-primary">
-                  <Link href={`/account/quotes/${encodeURIComponent(q.id)}`} className="tbl row-link">
-                    {q.draftOrderName}
-                  </Link>
-                </td>
-                <td className="col-meta muted">{fmtDate(q.date)}</td>
-                <td className="col-hide muted" style={{ fontSize: 12 }}>{q.title || "—"}</td>
-                <td className="col-status">
-                  <span className={`status status-${STATUS_CLS[q.status]}`}>{STATUS_LABELS[q.status]}</span>
-                </td>
-                <td className="col-value num">{q.total > 0 ? fmt(q.total) : "—"}</td>
-                <td className="col-meta muted">
-                  {q.expires && q.status === "in_process"
-                    ? <UrgencyPill dueDate={q.expires} />
-                    : q.expires ? fmtDate(q.expires) : "—"}
-                </td>
-                <td className="col-action">
-                  <Link href={`/account/quotes/${encodeURIComponent(q.id)}`} className="btn btn-ghost btn-xs">
-                    View
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="card">
+          <QuotesTable rows={quotes} showBuyer={currentView === "company"} />
+        </div>
       )}
     </div>
   );

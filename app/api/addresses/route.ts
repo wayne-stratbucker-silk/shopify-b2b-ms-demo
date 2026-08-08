@@ -18,6 +18,7 @@ export async function GET() {
         country?: string;
         firstName?: string;
         lastName?: string;
+        company?: string;
         phone?: string;
       }>;
     } | null;
@@ -25,7 +26,7 @@ export async function GET() {
     `query GetCustomerAddresses($id: ID!) {
       customer(id: $id) {
         addresses(first: 20) {
-          id address1 address2 city province zip country firstName lastName phone
+          id address1 address2 city province zip country firstName lastName company phone
         }
       }
     }`,
@@ -42,6 +43,7 @@ export async function POST(req: Request) {
   const body = await req.json() as {
     firstName?: string;
     lastName?: string;
+    company?: string;
     address1?: string;
     address2?: string;
     city?: string;
@@ -55,6 +57,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Address, city, and zip are required" }, { status: 400 });
   }
 
+  // Whitelist only valid MailingAddressInput fields — extra keys (e.g. attn,
+  // address_type) would fail GraphQL validation.
+  const address = {
+    firstName: body.firstName,
+    lastName: body.lastName,
+    company: body.company,
+    address1: body.address1,
+    address2: body.address2,
+    city: body.city,
+    province: body.province,
+    zip: body.zip,
+    country: body.country,
+    phone: body.phone,
+  };
+
   const result = await adminQuery<{
     customerAddressCreate: {
       customerAddress: { id: string } | null;
@@ -67,7 +84,7 @@ export async function POST(req: Request) {
         userErrors { message }
       }
     }`,
-    { customerId: session.customerId, address: body }
+    { customerId: session.customerId, address }
   );
 
   const errs = result.customerAddressCreate.userErrors;
