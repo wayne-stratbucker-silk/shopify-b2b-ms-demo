@@ -218,6 +218,8 @@ export interface Invoice {
 }
 
 // ─── Shopping List (backed by Shopify Metaobjects) ───
+export type ListVisibility = "private" | "company" | "shared";
+
 export interface ShoppingList {
   id: string;                 // Shopify Metaobject GID
   name: string;
@@ -225,8 +227,12 @@ export interface ShoppingList {
   lastUsed: string;
   shared: number;
   note?: string;
-  owner: string;
+  owner: string;              // owner Customer GID (customer_id field)
   companyId?: string;
+  /** Who can see this list: owner-only, whole company, or a custom set of users. */
+  visibility: ListVisibility;
+  /** Customer GIDs this list is explicitly shared with (visibility === "shared"). */
+  sharedWith: string[];
 }
 
 // ─── Category (mapped from Shopify Collection) ───

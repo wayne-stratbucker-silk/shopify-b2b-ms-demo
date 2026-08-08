@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
-import { getList } from "@/lib/lists/client";
+import { getList, canAccessList } from "@/lib/lists/client";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,8 @@ export default async function ListDetailPage({ params }: Props) {
 
   const { listId } = await params;
   const list = await getList(decodeURIComponent(listId)).catch(() => null);
-  if (!list) return notFound();
+  // IDOR guard: honor per-user visibility (owner / company / shared-with-me).
+  if (!list || !canAccessList(list, session.customerId)) return notFound();
 
   const subtotal = list.rawItems.reduce((s, i) => s + (i.quantity ?? 1), 0);
 
