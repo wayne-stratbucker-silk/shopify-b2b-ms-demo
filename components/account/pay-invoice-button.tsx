@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
+import { handleImpersonationBlock } from "@/components/staff/impersonation-toast";
 
 interface Props {
   orderId: string;
@@ -31,6 +32,8 @@ export function PayInvoiceButton({ orderId, amountLabel }: Props) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        // Best-effort: surface the impersonation-blocked toast when applicable.
+        if (handleImpersonationBlock(res, toast, data)) return;
         toast(data.error || "Payment could not be recorded", "error");
         return;
       }

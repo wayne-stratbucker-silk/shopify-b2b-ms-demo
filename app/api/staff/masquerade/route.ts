@@ -13,7 +13,7 @@ import {
   IMP_MAX_AGE,
   type ImpersonationGrant,
 } from "@/lib/auth/impersonation";
-import { getCompanyContactCustomerId } from "@/lib/staff/companies";
+import { getCompanyContactCustomerId, listCompanyContacts } from "@/lib/staff/companies";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -51,14 +51,33 @@ export async function POST(req: Request) {
   if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let companyId: string | undefined;
+  let requestedCustomerId: string | undefined;
+  let reason: string | undefined;
   try {
-    ({ companyId } = (await req.json()) as { companyId?: string });
+    ({ companyId, customerId: requestedCustomerId, reason } = (await req.json()) as {
+      companyId?: string;
+      customerId?: string;
+      reason?: string;
+    });
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
   if (!companyId) return NextResponse.json({ error: "companyId required" }, { status: 400 });
 
-  const customerId = await getCompanyContactCustomerId(companyId);
+  let customerId: string | null;
+  if (requestedCustomerId) {
+    // A specific contact was picked — it MUST be a contact of this company.
+    // Otherwise a staffer could target an arbitrary customer id via the API.
+    const contacts = await listCompanyContacts(companyId);
+    const isContact = contacts.some((c) => c.customerId === requestedCustomerId);
+    if (!isContact) {
+      return NextResponse.json({ error: "Not a contact of this company" }, { status: 403 });
+    }
+    customerId = requestedCustomerId;
+  } else {
+    // No contact chosen — fall back to the company's default contact.
+    customerId = await getCompanyContactCustomerId(companyId);
+  }
   if (!customerId) return NextResponse.json({ error: "No contact found for this company" }, { status: 404 });
 
   const customer = await getCustomerWithCompany(customerId).catch(() => null);
@@ -93,6 +112,9 @@ export async function POST(req: Request) {
     expiresAt: now + IMP_MAX_AGE * 1000,
     mode,
   };
+  // Optional audit-lite reason captured from the contact picker.
+  const trimmedReason = reason?.trim();
+  if (trimmedReason) grant.reason = trimmedReason;
   // Bind the buyer session to the grant via its sid (NOT a boolean flag).
   target.impSid = grant.sid;
 

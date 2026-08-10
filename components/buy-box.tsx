@@ -5,6 +5,8 @@ import { Icon } from "@/components/ui/icons";
 import { useQtyInput } from "@/lib/use-qty-input";
 import { SaveToListModal } from "@/components/save-to-list-modal";
 import { StockPill } from "@/components/ui/stock-pill";
+import { useToast } from "@/components/ui/toast";
+import { handleImpersonationBlock } from "@/components/staff/impersonation-toast";
 import {
   trackViewItem,
   trackAddToCart,
@@ -35,6 +37,7 @@ export function BuyBox({ product: p, isLoggedIn, variantId, forceOutOfStock = fa
   } | null>(null);
   const [addingToQuote, setAddingToQuote] = useState(false);
   const [addedToQuote, setAddedToQuote] = useState(false);
+  const { toast } = useToast();
 
   // Session / permissions — determines CTA order (non-order users lead with Add to Quote)
   const [session, setSession] = useState<{ b2bCompanyId?: number; permissions?: string[] } | null>(null);
@@ -149,6 +152,8 @@ export function BuyBox({ product: p, isLoggedIn, variantId, forceOutOfStock = fa
         warning?: { type: "outage" | "low-credit" | "over-limit"; message: string } | null;
       };
       if (!res.ok) {
+        // Best-effort: surface the impersonation-blocked toast when applicable.
+        if (handleImpersonationBlock(res, toast, data)) return;
         setCartError(data.error ?? "Could not add to cart");
         return;
       }
@@ -162,7 +167,7 @@ export function BuyBox({ product: p, isLoggedIn, variantId, forceOutOfStock = fa
     } finally {
       setAdding(false);
     }
-  }, [p, qty, unitPrice]);
+  }, [p, qty, unitPrice, toast]);
 
   const handleAddToQuote = useCallback(async () => {
     setAddingToQuote(true);
