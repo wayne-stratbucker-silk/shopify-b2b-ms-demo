@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { cartDiscountCodesUpdate } from "@/lib/shopify/queries/cart";
+import { guardImpersonatedWrite } from "@/lib/auth/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,9 @@ const CART_COOKIE = "shopify_cart_id";
  * Shopify echoes invalid codes back with applicable=false, so we surface that.
  */
 export async function POST(req: Request) {
+  const guard = await guardImpersonatedWrite("cart");
+  if (guard) return guard;
+
   const jar = await cookies();
   const cartId = jar.get(CART_COOKIE)?.value;
   if (!cartId) return NextResponse.json({ error: "No cart" }, { status: 400 });

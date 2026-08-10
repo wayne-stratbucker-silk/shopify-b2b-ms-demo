@@ -30,15 +30,17 @@ export async function POST() {
       companyLocationId: fresh.companyLocationId ?? session.companyLocationId,
       role: fresh.role,
       permissions: fresh.permissions,
-      // Preserve impersonation flag — a refresh must never launder away the fact
-      // that this is a staff masquerade.
-      isImpersonated: session.isImpersonated,
+      // Preserve the impersonation binding — a refresh must never launder away
+      // the fact that this is a staff masquerade (impSid still requires a live
+      // grant on the next getSession).
+      impSid: session.impSid,
     };
 
     const response = NextResponse.json({ ok: true, reason: "refreshed", companyName: merged.companyName, name: merged.name });
     // Impersonated sessions get a short (8h) lifetime instead of the normal 14
-    // days, so a refresh can't be used to extend a masquerade indefinitely.
-    const cookieOpts = merged.isImpersonated
+    // days, so a refresh can't be used to extend a masquerade indefinitely. The
+    // acme_imp grant itself is never touched here.
+    const cookieOpts = merged.impSid
       ? { ...SESSION_COOKIE_OPTS, maxAge: 60 * 60 * 8 }
       : SESSION_COOKIE_OPTS;
     response.cookies.set(SESSION_COOKIE, encodeSession(merged), cookieOpts);

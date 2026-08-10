@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { cartCreate, cartLinesAdd } from "@/lib/shopify/queries/cart";
 import { getSession } from "@/lib/auth/session";
+import { guardImpersonatedWrite } from "@/lib/auth/impersonation";
 
 const CART_COOKIE = "shopify_cart_id";
 
@@ -15,6 +16,9 @@ interface LineInput {
 // resolved rows land in one atomic cart mutation; the PDP buy box still posts a
 // single line. Returns `cartUrl` for callers that redirect to the cart.
 export async function POST(req: Request) {
+  const guard = await guardImpersonatedWrite("cart");
+  if (guard) return guard;
+
   const body = (await req.json()) as LineInput & { items?: LineInput[] };
 
   const rawItems: LineInput[] = Array.isArray(body.items)

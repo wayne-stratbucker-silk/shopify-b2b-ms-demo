@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { guardImpersonatedWrite } from "@/lib/auth/impersonation";
 import { getQuoteCartDraftOrderId, setQuoteCartDraftOrderId } from "@/lib/quotes/quote-cart";
 import { getQuote, createCartDraftOrder, updateCartDraftOrder } from "@/lib/quotes/client";
 import { getProductBySku } from "@/lib/shopify/queries/products";
@@ -8,6 +9,8 @@ import { adminQuery } from "@/lib/shopify/admin-client";
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await guardImpersonatedWrite("quote");
+  if (guard) return guard;
 
   const body = await req.json() as {
     sku?: string;

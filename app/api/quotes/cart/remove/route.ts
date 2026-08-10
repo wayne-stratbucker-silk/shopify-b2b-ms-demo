@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { guardImpersonatedWrite } from "@/lib/auth/impersonation";
 import { getQuoteCartDraftOrderId, clearQuoteCart } from "@/lib/quotes/quote-cart";
 import { getQuote, updateCartDraftOrder, deleteCartDraftOrder } from "@/lib/quotes/client";
 
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await guardImpersonatedWrite("quote");
+  if (guard) return guard;
 
   const { sku } = await req.json() as { sku?: string };
   if (!sku) return NextResponse.json({ error: "sku required" }, { status: 400 });

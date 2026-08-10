@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth/session";
+import { guardImpersonatedWrite } from "@/lib/auth/impersonation";
 import { hasPermission } from "@/lib/auth/permissions";
 import { placeExpress } from "@/lib/checkout/express";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
@@ -15,6 +16,8 @@ export async function POST(req: Request) {
 
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await guardImpersonatedWrite("order_place");
+  if (guard) return guard;
   if (!hasPermission(session.permissions, "company.orders.create")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

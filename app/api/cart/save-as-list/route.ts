@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { guardImpersonatedWrite } from "@/lib/auth/impersonation";
 import { createList, addItemToList } from "@/lib/lists/client";
 
 interface CartLine {
@@ -13,6 +14,8 @@ interface CartLine {
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await guardImpersonatedWrite("cart");
+  if (guard) return guard;
 
   const { name, lines } = await req.json() as { name?: string; lines?: CartLine[] };
 

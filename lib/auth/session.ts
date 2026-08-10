@@ -1,23 +1,11 @@
 import { cache } from "react";
-import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { permissionsForRole, type Permission } from "@/lib/auth/permissions";
+import { encodeSigned, decodeSigned } from "@/lib/auth/hmac";
+import { getImpersonationContext } from "@/lib/auth/impersonation";
 
 const COOKIE = "acme_session";
 const ACTIVE_LOCATION_COOKIE = "acme_active_location";
-
-function getSessionSecret(): string {
-  const s = process.env.SESSION_SECRET;
-  if (process.env.NODE_ENV === "production") {
-    if (!s || s === "dev-secret") {
-      throw new Error(
-        "SESSION_SECRET must be set in production. Generate with: openssl rand -base64 64",
-      );
-    }
-    return s;
-  }
-  return s || "dev-secret";
-}
 
 export interface Session {
   customerId: string;           // Shopify Customer GID: gid://shopify/Customer/...
@@ -29,32 +17,17 @@ export interface Session {
   companyLocationId?: string;   // Active CompanyLocation GID (set at login, switchable)
   role: "admin" | "buyer";     // From CompanyContactRole at active location
   permissions: Permission[];
-  isImpersonated?: boolean;
-}
-
-function sign(payload: string): string {
-  return createHmac("sha256", getSessionSecret()).update(payload).digest("hex");
+  // Set only on staff-masquerade buyer sessions: the impersonation grant's `sid`.
+  // getSession requires a matching valid `acme_imp` grant when this is present.
+  impSid?: string;
 }
 
 export function encodeSession(session: Session): string {
-  const payload = Buffer.from(JSON.stringify(session)).toString("base64url");
-  const sig = sign(payload);
-  return `${payload}.${sig}`;
+  return encodeSigned(session);
 }
 
 export function decodeSession(token: string): Session | null {
-  try {
-    const dot = token.lastIndexOf(".");
-    if (dot === -1) return null;
-    const payload = token.slice(0, dot);
-    const sig = token.slice(dot + 1);
-    const expected = sign(payload);
-    if (expected.length !== sig.length) return null;
-    if (!timingSafeEqual(Buffer.from(expected), Buffer.from(sig))) return null;
-    return JSON.parse(Buffer.from(payload, "base64url").toString()) as Session;
-  } catch {
-    return null;
-  }
+  return decodeSigned<Session>(token);
 }
 
 export const getSession = cache(async (): Promise<Session | null> => {
@@ -73,6 +46,16 @@ export const getSession = cache(async (): Promise<Session | null> => {
   // Ensure permissions are always populated from role
   if (!session.permissions?.length) {
     session.permissions = permissionsForRole(session.role);
+  }
+
+  // Impersonation sessions (those minted by a staff masquerade) carry an
+  // `impSid` and REQUIRE a live, matching grant. If the grant is missing,
+  // expired, revoked, or bound to a different sid, the buyer session is invalid
+  // — fail closed. Normal (non-impersonated) sessions skip this entirely and
+  // incur no extra work / network.
+  if (session.impSid) {
+    const ctx = await getImpersonationContext();
+    if (!ctx || ctx.grant.sid !== session.impSid) return null;
   }
 
   return session;
