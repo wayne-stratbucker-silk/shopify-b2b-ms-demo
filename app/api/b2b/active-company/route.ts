@@ -7,6 +7,7 @@ import {
   ACTIVE_LOCATION_COOKIE_NAME,
 } from "@/lib/auth/session";
 import { getCustomerWithCompany, buildSession } from "@/lib/auth/customer-accounts";
+import { getImpersonationContext } from "@/lib/auth/impersonation";
 import { companyGidToNumber } from "@/lib/b2b/credit";
 
 // Switch the active company for a multi-company contact. Re-issues the signed
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
 
   // A staff masquerade is pinned to the company it was launched for; switching
   // companies mid-impersonation would silently re-scope the impersonated session.
-  if (session.isImpersonated) {
+  if (await getImpersonationContext()) {
     return NextResponse.json({ error: "Cannot switch company while impersonating" }, { status: 403 });
   }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { getImpersonationContext } from "@/lib/auth/impersonation";
 import { adminQuery } from "@/lib/shopify/admin-client";
 
 export async function GET() {
@@ -12,7 +13,7 @@ export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "no_session" }, { status: 401 });
 
-  if (session.isImpersonated) {
+  if (await getImpersonationContext()) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 

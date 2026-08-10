@@ -1,24 +1,37 @@
 import { NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { cookies } from "next/headers";
 import { getSession, encodeSession, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "@/lib/auth/session";
 import { getCustomerWithCompany, buildSession } from "@/lib/auth/customer-accounts";
-import { getStaffSession, STAFF_MASQ_COOKIE } from "@/lib/staff/session";
+import { getStaffSession } from "@/lib/staff/session";
+import { resolveRep, repCanImpersonate } from "@/lib/staff/rep";
+import {
+  encodeGrant,
+  getImpersonationContext,
+  IMP_COOKIE,
+  IMP_COOKIE_OPTS,
+  IMP_MAX_AGE,
+  type ImpersonationGrant,
+} from "@/lib/auth/impersonation";
 import { getCompanyContactCustomerId } from "@/lib/staff/companies";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 // Whether the current buyer session is a staff masquerade (drives the banner).
+// Keys masquerading/company/name/staff are kept backward-compatible with the
+// banner; mode/expiresAt are additive.
 export async function GET() {
+  const ctx = await getImpersonationContext();
+  if (!ctx) return NextResponse.json({ masquerading: false });
   const session = await getSession();
-  const jar = await cookies();
-  const masq = jar.get(STAFF_MASQ_COOKIE)?.value;
-  if (!session?.isImpersonated || !masq) return NextResponse.json({ masquerading: false });
   return NextResponse.json({
     masquerading: true,
-    company: session.companyName,
-    name: session.name,
-    staff: masq,
+    company: session?.companyName,
+    name: session?.name,
+    staff: ctx.grant.actorEmail,
+    mode: ctx.grant.mode,
+    expiresAt: ctx.grant.expiresAt,
   });
 }
 
@@ -58,11 +71,37 @@ export async function POST(req: Request) {
   if (!target.companyId || target.companyId !== companyId) {
     return NextResponse.json({ error: "Company mismatch" }, { status: 403 });
   }
-  target.isImpersonated = true;
+
+  // Rep→company scoping gate: the acting staff must be a resolvable rep that is
+  // authorized to impersonate THIS company. Refuse (issuing no cookies) otherwise.
+  const rep = await resolveRep(staff.email);
+  if (!rep || !(await repCanImpersonate(rep, companyId))) {
+    return NextResponse.json({ error: "Not authorized for this company" }, { status: 403 });
+  }
+
+  // A rep that can place orders may assist (prepare orders / edit cart / draft
+  // quotes); otherwise the masquerade is read-only.
+  const mode = rep.canPlaceOrders ? "assist" : "read_only";
+
+  const now = Date.now();
+  const grant: ImpersonationGrant = {
+    actorEmail: staff.email,
+    actorRepId: rep.id,
+    companyId,
+    sid: randomBytes(16).toString("hex"),
+    startedAt: now,
+    expiresAt: now + IMP_MAX_AGE * 1000,
+    mode,
+  };
+  // Bind the buyer session to the grant via its sid (NOT a boolean flag).
+  target.impSid = grant.sid;
 
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, encodeSession(target), SESSION_COOKIE_OPTS);
-  jar.set(STAFF_MASQ_COOKIE, staff.email, { ...SESSION_COOKIE_OPTS, maxAge: 60 * 60 * 8 });
+  // Cap the buyer cookie to the grant's 8h lifetime so it can't outlive the grant.
+  jar.set(SESSION_COOKIE, encodeSession(target), { ...SESSION_COOKIE_OPTS, maxAge: IMP_MAX_AGE });
+  jar.set(IMP_COOKIE, encodeGrant(grant), IMP_COOKIE_OPTS);
+
+  console.info("[impersonation] start", { actor: staff.email, companyId, mode });
 
   return NextResponse.json({ ok: true, redirect: "/account", company: target.companyName });
 }

@@ -3,21 +3,10 @@
 // Google OAuth (see lib/staff/google.ts) and can masquerade into a company.
 
 import { cache } from "react";
-import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import { encodeSigned, decodeSigned } from "@/lib/auth/hmac";
 
 const COOKIE = "acme_staff";
-
-function secret(): string {
-  const s = process.env.SESSION_SECRET;
-  if (process.env.NODE_ENV === "production") {
-    if (!s || s === "dev-secret") {
-      throw new Error("SESSION_SECRET must be set in production.");
-    }
-    return s;
-  }
-  return s || "dev-secret";
-}
 
 export interface StaffSession {
   email: string;
@@ -25,28 +14,12 @@ export interface StaffSession {
   picture?: string;
 }
 
-function sign(payload: string): string {
-  return createHmac("sha256", secret()).update(payload).digest("hex");
-}
-
 export function encodeStaff(session: StaffSession): string {
-  const payload = Buffer.from(JSON.stringify(session)).toString("base64url");
-  return `${payload}.${sign(payload)}`;
+  return encodeSigned(session);
 }
 
 export function decodeStaff(token: string): StaffSession | null {
-  try {
-    const dot = token.lastIndexOf(".");
-    if (dot === -1) return null;
-    const payload = token.slice(0, dot);
-    const sig = token.slice(dot + 1);
-    const expected = sign(payload);
-    if (expected.length !== sig.length) return null;
-    if (!timingSafeEqual(Buffer.from(expected), Buffer.from(sig))) return null;
-    return JSON.parse(Buffer.from(payload, "base64url").toString()) as StaffSession;
-  } catch {
-    return null;
-  }
+  return decodeSigned<StaffSession>(token);
 }
 
 export const getStaffSession = cache(async (): Promise<StaffSession | null> => {
@@ -64,6 +37,3 @@ export const STAFF_COOKIE_OPTS = {
   path: "/",
   maxAge: 60 * 60 * 8, // 8-hour staff shift
 };
-
-/** Cookie flag marking that the current buyer session is a staff masquerade. */
-export const STAFF_MASQ_COOKIE = "acme_staff_masq";

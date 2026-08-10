@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { guardImpersonatedWrite } from "@/lib/auth/impersonation";
 import { hasPermission } from "@/lib/auth/permissions";
 import {
   listCompanyFiles,
@@ -37,6 +38,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session?.companyId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await guardImpersonatedWrite("settings");
+  if (guard) return guard;
   // Uploading company documents is an admin-level action.
   if (!hasPermission(session.permissions, "company.settings.manage")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

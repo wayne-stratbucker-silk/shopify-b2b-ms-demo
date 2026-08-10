@@ -5,7 +5,7 @@ export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ user: null }, { status: 401 });
   // Whitelist the fields we expose — never leak the raw session (in particular
-  // the isImpersonated flag stays server-side).
+  // the impSid impersonation binding stays server-side).
   return NextResponse.json({
     user: {
       customerId: session.customerId,
