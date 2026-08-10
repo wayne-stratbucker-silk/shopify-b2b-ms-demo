@@ -18,6 +18,7 @@
     "seed:inventory": "node --env-file=.env.local --import tsx/esm scripts/seed-inventory.mts",
     "seed:credit": "node --env-file=.env.local --import tsx/esm scripts/seed-credit.mts",
     "seed:lists-def": "node --env-file=.env.local --import tsx/esm scripts/create-shopping-list-metaobject.mts",
+    "seed:sales-reps": "node --env-file=.env.local --import tsx/esm scripts/create-sales-rep-metaobject.mts",
     "publish:products": "node --env-file=.env.local --import tsx/esm scripts/publish-products.mts",
     "assign:roles": "node --env-file=.env.local --import tsx/esm scripts/assign-company-roles.mts",
     "seed:quotes": "node --env-file=.env.local --import tsx/esm scripts/seed-quotes.mts",
