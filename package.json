@@ -21,7 +21,10 @@
     "publish:products": "node --env-file=.env.local --import tsx/esm scripts/publish-products.mts",
     "assign:roles": "node --env-file=.env.local --import tsx/esm scripts/assign-company-roles.mts",
     "seed:quotes": "node --env-file=.env.local --import tsx/esm scripts/seed-quotes.mts",
-    "seed:metafield-defs": "node --env-file=.env.local --import tsx/esm scripts/create-metafield-definitions.mts"
+    "seed:metafield-defs": "node --env-file=.env.local --import tsx/esm scripts/create-metafield-definitions.mts",
+    "seed:images": "node --env-file=.env.local --import tsx/esm scripts/seed-product-images.mts",
+    "seed:specs": "node --env-file=.env.local --import tsx/esm scripts/backfill-spec-metafields.mts",
+    "audit:catalog": "node --env-file=.env.local --import tsx/esm scripts/audit-catalog.mts"
   },
   "dependencies": {
     "@makeswift/next-plugin": "^0.6.1",
