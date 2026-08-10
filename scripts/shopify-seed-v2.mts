@@ -969,7 +969,7 @@ interface CompanyResult {
   contactCustomerIds: string[];
 }
 
-async function createCompanies(prodResults: ProductResult[]): Promise<CompanyResult[]> {
+async function createCompanies(_prodResults: ProductResult[]): Promise<CompanyResult[]> {
   console.log("\n🏢 Creating B2B companies...");
   const results: CompanyResult[] = [];
 

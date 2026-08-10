@@ -71,7 +71,6 @@ function statusKind(status: QuoteStatus): QuoteStatusKind {
   return "muted";
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapDraftOrder(node: any): Quote {
   const status = (getMeta(node.metafields, "status") || "new") as QuoteStatus;
   const notesRaw = getMeta(node.metafields, "notes_thread");
@@ -339,7 +338,6 @@ export interface CreateQuoteInput {
 }
 
 export async function createQuote(input: CreateQuoteInput): Promise<{ id: string; name: string }> {
-  const now = new Date().toISOString();
   const data = await adminQuery<{
     draftOrderCreate: {
       draftOrder: { id: string; name: string } | null;

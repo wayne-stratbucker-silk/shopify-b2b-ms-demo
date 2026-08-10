@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const PROTECTED_PATHS = ["/account", "/api/quotes", "/api/lists", "/api/account"];
-const AUTH_EXEMPT = ["/api/auth", "/api/makeswift", "/api/security", "/api/algolia-sync"];
+const AUTH_EXEMPT = ["/api/auth", "/api/makeswift", "/api/security"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
