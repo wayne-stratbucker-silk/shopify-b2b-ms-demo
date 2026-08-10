@@ -16,6 +16,12 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // A staff masquerade is pinned to the company it was launched for; switching
+  // companies mid-impersonation would silently re-scope the impersonated session.
+  if (session.isImpersonated) {
+    return NextResponse.json({ error: "Cannot switch company while impersonating" }, { status: 403 });
+  }
+
   const { companyId } = (await request.json().catch(() => ({}))) as { companyId?: number };
   if (companyId == null) return NextResponse.json({ error: "companyId required" }, { status: 400 });
 

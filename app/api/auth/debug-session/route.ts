@@ -3,8 +3,18 @@ import { getSession } from "@/lib/auth/session";
 import { adminQuery } from "@/lib/shopify/admin-client";
 
 export async function GET() {
+  // This route dumps raw customer/company data — keep it out of production, and
+  // never expose it to an impersonated (staff masquerade) session.
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "no_session" }, { status: 401 });
+
+  if (session.isImpersonated) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
 
   const result: Record<string, unknown> = {
     sessionCustomerId: session.customerId,

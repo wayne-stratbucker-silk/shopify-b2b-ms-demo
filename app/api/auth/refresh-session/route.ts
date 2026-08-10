@@ -30,10 +30,18 @@ export async function POST() {
       companyLocationId: fresh.companyLocationId ?? session.companyLocationId,
       role: fresh.role,
       permissions: fresh.permissions,
+      // Preserve impersonation flag — a refresh must never launder away the fact
+      // that this is a staff masquerade.
+      isImpersonated: session.isImpersonated,
     };
 
     const response = NextResponse.json({ ok: true, reason: "refreshed", companyName: merged.companyName, name: merged.name });
-    response.cookies.set(SESSION_COOKIE, encodeSession(merged), SESSION_COOKIE_OPTS);
+    // Impersonated sessions get a short (8h) lifetime instead of the normal 14
+    // days, so a refresh can't be used to extend a masquerade indefinitely.
+    const cookieOpts = merged.isImpersonated
+      ? { ...SESSION_COOKIE_OPTS, maxAge: 60 * 60 * 8 }
+      : SESSION_COOKIE_OPTS;
+    response.cookies.set(SESSION_COOKIE, encodeSession(merged), cookieOpts);
     console.info("[refresh-session] updated — name:", merged.name, "company:", merged.companyName);
     return response;
   } catch (e) {
