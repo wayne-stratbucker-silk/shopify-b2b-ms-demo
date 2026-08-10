@@ -1,7 +1,7 @@
 /**
  * Shopify B2B Store Seeding Script v2
  *
- * Seeds makeswift-b2b-demo.myshopify.com with:
+ * Seeds the store at $SHOPIFY_STORE_DOMAIN (from .env.local) with:
  * - 44 electrical supply products across 6 collections
  * - 6 B2B companies with contacts, locations, price lists, catalogs
  * - Historical orders via REST API
