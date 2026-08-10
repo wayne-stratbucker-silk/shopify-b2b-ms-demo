@@ -4,6 +4,7 @@ import { getSession, encodeSession, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "
 import { getCustomerWithCompany, buildSession } from "@/lib/auth/customer-accounts";
 import { getStaffSession, STAFF_MASQ_COOKIE } from "@/lib/staff/session";
 import { getCompanyContactCustomerId } from "@/lib/staff/companies";
+import { enforceRateLimit } from "@/lib/security/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,16 @@ export async function GET() {
 
 // Staff-only: assume a buyer session for a company.
 export async function POST(req: Request) {
+  const limited = enforceRateLimit(req, "masquerade", 10, 60_000);
+  if (limited) return limited;
+
+  // Same-origin guard: when an Origin header is present it must match this host.
+  // (Absent Origin — e.g. same-origin GET-style navigations — is allowed.)
+  const origin = req.headers.get("origin");
+  if (origin && origin !== new URL(req.url).origin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const staff = await getStaffSession();
   if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -40,7 +51,13 @@ export async function POST(req: Request) {
   const customer = await getCustomerWithCompany(customerId).catch(() => null);
   if (!customer) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
 
-  const target = buildSession(customer);
+  // Scope the buyer session to the requested company (not just the contact's
+  // first company). If it can't be scoped to that exact company, refuse and
+  // issue no cookies — this prevents cross-company impersonation.
+  const target = buildSession(customer, companyId);
+  if (!target.companyId || target.companyId !== companyId) {
+    return NextResponse.json({ error: "Company mismatch" }, { status: 403 });
+  }
   target.isImpersonated = true;
 
   const jar = await cookies();
