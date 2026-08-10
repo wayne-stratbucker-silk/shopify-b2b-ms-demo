@@ -8,7 +8,7 @@ import {
 import { MSImage, toUrl } from "@/components/makeswift/ms-image";
 import { AltTextNotice } from "@/components/makeswift/builder-notice";
 import { isAltMissing } from "@/lib/seo-audit";
-import { ctaClass, CTA_STYLE_OPTIONS, type CtaStyle } from "@/lib/makeswift/cta-class";
+import { ctaClass, type CtaStyle } from "@/lib/makeswift/cta-class";
 import { linkProps, type MSLink } from "@/lib/makeswift/link";
 
 type MediaType = "none" | "image" | "video";

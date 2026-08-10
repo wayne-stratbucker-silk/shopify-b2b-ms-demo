@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getSession, encodeSession, decodeSession, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "@/lib/auth/session";
+import { getSession, encodeSession, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "@/lib/auth/session";
 import { getCustomerWithCompany, buildSession } from "@/lib/auth/customer-accounts";
 
 const IMPERSONATE_ORIGINAL_COOKIE = "acme_impersonate_original";

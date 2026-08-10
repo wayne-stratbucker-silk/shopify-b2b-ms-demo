@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import dynamic from "next/dynamic";
 import { runtime } from "@/lib/makeswift/runtime";
 import { Style, RichText, Select, TextArea, Group } from "@makeswift/runtime/controls";
 
@@ -32,8 +31,6 @@ function RichDocument({
   className,
   content,
   width = "normal",
-  editor = "makeswift",
-  markdown,
 }: RichDocumentProps) {
   return (
     <section className={className ?? ""}>
